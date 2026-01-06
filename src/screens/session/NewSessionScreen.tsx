@@ -3,10 +3,32 @@ import React, { useState } from 'react';
 import { StyleSheet, View, ScrollView, Alert, Platform } from 'react-native';
 import { Text, useTheme, SegmentedButtons, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Button, Input, Card } from '../../components/common';
 import { useAuthStore, useSessionStore } from '../../store';
 import { SessionFormData } from '../../types';
+
+// Web-compatible DateTimePicker component
+const DateTimePicker = ({ value, mode, onChange, maximumDate }: any) => {
+  return (
+    <input
+      type="date"
+      value={value.toISOString().split('T')[0]}
+      max={maximumDate?.toISOString().split('T')[0]}
+      onChange={(e) => {
+        const newDate = e.target.value ? new Date(e.target.value) : value;
+        onChange(null, newDate);
+      }}
+      style={{
+        padding: 12,
+        fontSize: 16,
+        borderRadius: 8,
+        border: '1px solid #ccc',
+        marginBottom: 16,
+        width: '100%',
+      }}
+    />
+  );
+};
 
 interface NewSessionScreenProps {
   navigation: any;
@@ -176,30 +198,6 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
       </View>
     </SafeAreaView>
   );
-};
-
-// Simple DateTimePicker fallback for web
-const DateTimePicker = ({ value, mode, onChange, maximumDate }: any) => {
-  if (Platform.OS === 'web') {
-    return (
-      <input
-        type="date"
-        value={value.toISOString().split('T')[0]}
-        max={maximumDate?.toISOString().split('T')[0]}
-        onChange={(e) => onChange(null, new Date(e.target.value))}
-        style={{
-          padding: 12,
-          fontSize: 16,
-          borderRadius: 8,
-          border: '1px solid #ccc',
-          marginBottom: 16,
-        }}
-      />
-    );
-  }
-  
-  // For native, would use @react-native-community/datetimepicker
-  return null;
 };
 
 const styles = StyleSheet.create({

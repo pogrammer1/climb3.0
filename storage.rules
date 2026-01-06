@@ -1,0 +1,66 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check file size (max 5MB)
+    function isValidSize() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+    
+    // Helper function to check if file is an image
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Profile photos
+    match /profile-photos/{userId}/{fileName} {
+      // Anyone authenticated can view profile photos
+      allow read: if isAuthenticated();
+      
+      // Only the user can upload their own profile photo
+      allow write: if isAuthenticated() && 
+                     request.auth.uid == userId &&
+                     isImage() &&
+                     isValidSize();
+      
+      // Only the user can delete their own profile photo
+      allow delete: if isAuthenticated() && 
+                      request.auth.uid == userId;
+    }
+    
+    // Session photos (for climb photos)
+    match /session-photos/{userId}/{sessionId}/{fileName} {
+      // User can read their own session photos
+      allow read: if isAuthenticated() && 
+                    request.auth.uid == userId;
+      
+      // User can upload photos to their sessions
+      allow write: if isAuthenticated() && 
+                     request.auth.uid == userId &&
+                     isImage() &&
+                     isValidSize();
+      
+      // User can delete their session photos
+      allow delete: if isAuthenticated() && 
+                      request.auth.uid == userId;
+    }
+    
+    // Chat images (shared in conversations)
+    match /chat-images/{conversationId}/{fileName} {
+      // For now, any authenticated user can read chat images
+      // In production, you'd want to verify conversation membership
+      allow read: if isAuthenticated();
+      
+      // Authenticated users can upload chat images
+      allow write: if isAuthenticated() &&
+                     isImage() &&
+                     isValidSize();
+    }
+  }
+}

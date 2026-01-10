@@ -1,6 +1,6 @@
 // Profile Screen
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, Alert } from 'react-native';
+import { StyleSheet, View, ScrollView } from 'react-native';
 import { Text, useTheme, Divider, Switch, List } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { Card, Avatar, Button } from '../../components/common';
 import { useAuthStore } from '../../store';
 import { signOut } from '../../services/authService';
 import { uploadProfilePhoto, toggleSearchability } from '../../services/profileService';
+import { showAlert } from '../../utils/alert';
 
 interface ProfileScreenProps {
   navigation: any;
@@ -29,7 +30,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please allow access to your photos.');
+        showAlert('Permission Required', 'Please allow access to your photos.');
         return;
       }
 
@@ -48,7 +49,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       }
     } catch (error) {
       setIsUploading(false);
-      Alert.alert('Error', 'Failed to upload photo. Please try again.');
+      showAlert('Error', 'Failed to upload photo. Please try again.');
     }
   };
 
@@ -59,7 +60,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   };
 
   const handleSignOut = () => {
-    Alert.alert(
+    showAlert(
       'Sign Out',
       'Are you sure you want to sign out?',
       [

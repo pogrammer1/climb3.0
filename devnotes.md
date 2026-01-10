@@ -3,6 +3,7 @@
 
 1/10/26
 - beware of firebase configs accidently pushed onto non gitignore file, change configs later when repo public
+- server startup fixed but server not working in some aspects, need to test and fix features
 
 
 

@@ -30,6 +30,17 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
     
+    // Profiles collection
+    match /profiles/{userId} {
+      // Anyone authenticated can read profiles (for discovery)
+      allow read: if isAuthenticated();
+      
+      // Only the user can write their own profile
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+    
     // Sessions collection
     match /sessions/{sessionId} {
       // Users can only read their own sessions

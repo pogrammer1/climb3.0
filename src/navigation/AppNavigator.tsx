@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { useAuthStore } from '../store';
-import { profileService } from '../services/profileService';
+import { getProfile } from '../services/profileService';
 import { AuthNavigator } from './AuthNavigator';
 import { RootNavigator } from './RootNavigator';
 import { LoadingSpinner } from '../components/common';
@@ -23,10 +23,16 @@ export const AppNavigator: React.FC = () => {
 
       if (firebaseUser) {
         try {
-          const profile = await profileService.getProfile(firebaseUser.uid);
-          setProfile(profile);
+          const result = await getProfile(firebaseUser.uid);
+          if (result.success && result.data) {
+            setProfile(result.data);
+          } else {
+            // Profile doesn't exist yet, that's okay for new users
+            setProfile(null);
+          }
         } catch (error) {
           console.error('Error fetching profile:', error);
+          setProfile(null);
         }
       } else {
         setProfile(null);

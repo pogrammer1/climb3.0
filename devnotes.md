@@ -45,6 +45,7 @@ src/
 ### Prerequisites
 
 - Node.js 18+
+- git
 - npm or yarn
 - Expo CLI
 - Firebase account
@@ -60,6 +61,7 @@ cd climb-app
 2. Install dependencies
 ```bash
 npm install
+npm install -g firebase-tools
 ```
 
 3. Configure Firebase

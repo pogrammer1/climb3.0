@@ -1,12 +1,18 @@
 1/6/26 
 - starting over cuz last one shit itself, need to keep work linear and context-aware
 
+1/10/26
+- beware of firebase configs accidently pushed onto non gitignore file, change configs later when repo public
+
 
 
 troubleshooting
 1/6/26
 1. internal error when npm start: npm install --save-dev down babel-plugin-module-resolver
 2. no favicon images?? required for expo web builds i guess
+
+1/10/26
+1. server starts fine but nothing display on local host
 
 
 

@@ -20,6 +20,14 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
+// Validate Firebase config
+const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'] as const;
+const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
+if (missingKeys.length > 0) {
+  console.warn('Missing Firebase config keys:', missingKeys);
+  console.warn('Current config:', JSON.stringify(firebaseConfig, null, 2));
+}
+
 // Initialize Firebase (prevent re-initialization)
 let app: FirebaseApp;
 let auth: Auth;

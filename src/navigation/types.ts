@@ -26,6 +26,7 @@ export type RootStackParamList = {
   Chat: { conversationId: string };
   EditProfile: undefined;
   MatchProfile: { matchId: string };
+  ClimberProfile: { climberId: string };
   Settings: undefined;
 };
 

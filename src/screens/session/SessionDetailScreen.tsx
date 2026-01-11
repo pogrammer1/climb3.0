@@ -1,14 +1,15 @@
 // Session Detail Screen - View and manage climbing session
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ScrollView, Alert } from 'react-native';
+import { StyleSheet, View, ScrollView } from 'react-native';
 import { Text, useTheme, IconButton, FAB, Portal, Modal, Divider, Menu, Chip } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button, LoadingSpinner, EmptyState, GradePicker } from '../../components/common';
-import { useSessionStore } from '../../store';
-import { ClimbingSession, Climb, ClimbingType, BoulderGrade, RopeGrade } from '../../types';
+import { useSessionStore, useAuthStore } from '../../store';
+import { ClimbingSession, Climb, ClimbingType, ClimbFormData, AttemptResult, YDSGrade, BoulderingGrade } from '../../types';
 import { format } from 'date-fns';
-import { CLIMBING_TYPES } from '../../constants';
+import { CLIMBING_TYPES, ATTEMPT_RESULTS } from '../../constants';
+import { showAlert } from '../../utils/alert';
 
 interface SessionDetailScreenProps {
   navigation: any;
@@ -22,74 +23,100 @@ interface SessionDetailScreenProps {
 export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ navigation, route }) => {
   const { sessionId } = route.params;
   const theme = useTheme();
-  const { currentSession, isLoading, error, fetchSession, addClimbToSession, deleteSession } = useSessionStore();
+  const { user } = useAuthStore();
+  const { currentSession, currentSessionClimbs, isLoading, error, fetchSession, fetchSessionClimbs, addClimbToSession, deleteExistingSession, fetchStats } = useSessionStore();
   
   const [menuVisible, setMenuVisible] = useState(false);
   const [addClimbModalVisible, setAddClimbModalVisible] = useState(false);
-  const [newClimb, setNewClimb] = useState<Partial<Climb>>({
-    type: 'bouldering',
+  const [gradeSystem, setGradeSystem] = useState<'yds' | 'v-scale'>('v-scale');
+  const [newClimb, setNewClimb] = useState<Partial<ClimbFormData>>({
+    climbingType: 'Bouldering',
     grade: 'V0',
-    attempts: 1,
-    completed: true,
+    gradeSystem: 'v-scale',
+    attempts: '1',
+    result: 'Send',
+    notes: '',
+    rating: 3,
   });
 
   useEffect(() => {
     fetchSession(sessionId);
+    fetchSessionClimbs(sessionId);
   }, [sessionId]);
 
-  const handleDelete = () => {
-    Alert.alert(
-      'Delete Session',
-      'Are you sure you want to delete this session? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteSession(sessionId);
-              navigation.goBack();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete session');
-            }
-          },
-        },
-      ]
-    );
+  const handleDelete = async () => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      showAlert(
+        'Delete Session',
+        'Are you sure you want to delete this session? This action cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+        ]
+      );
+    });
+
+    if (confirmed) {
+      try {
+        const success = await deleteExistingSession(sessionId);
+        if (success) {
+          // Refresh stats after deletion
+          if (user) {
+            await fetchStats(user.uid);
+          }
+          navigation.goBack();
+        } else {
+          showAlert('Error', 'Failed to delete session. Please try again.');
+        }
+      } catch (error) {
+        console.error('Delete error:', error);
+        showAlert('Error', 'Failed to delete session');
+      }
+    }
   };
 
   const handleAddClimb = async () => {
     if (!newClimb.grade) {
-      Alert.alert('Error', 'Please select a grade');
+      showAlert('Error', 'Please select a grade');
       return;
     }
 
-    const climb: Omit<Climb, 'id'> = {
-      type: newClimb.type as ClimbingType,
-      grade: newClimb.grade as BoulderGrade | RopeGrade,
-      attempts: newClimb.attempts || 1,
-      completed: newClimb.completed ?? true,
-      notes: newClimb.notes,
+    const climbData: ClimbFormData = {
+      name: newClimb.name || '',
+      climbingType: newClimb.climbingType || 'Bouldering',
+      grade: newClimb.grade || 'V0',
+      gradeSystem: newClimb.gradeSystem || 'v-scale',
+      attempts: newClimb.attempts || '1',
+      result: newClimb.result || 'Send',
+      notes: newClimb.notes || '',
+      rating: newClimb.rating || 3,
     };
 
     try {
-      await addClimbToSession(sessionId, climb);
+      await addClimbToSession(sessionId, climbData);
+      // Refresh stats for the home screen
+      if (user) {
+        await fetchStats(user.uid);
+      }
       setAddClimbModalVisible(false);
       setNewClimb({
-        type: 'bouldering',
+        climbingType: 'Bouldering',
         grade: 'V0',
-        attempts: 1,
-        completed: true,
+        gradeSystem: 'v-scale',
+        attempts: '1',
+        result: 'Send',
+        notes: '',
+        rating: 3,
       });
     } catch (error) {
-      Alert.alert('Error', 'Failed to add climb');
+      showAlert('Error', 'Failed to add climb');
     }
   };
 
-  const getGradeColor = (type: ClimbingType, completed: boolean): string => {
-    if (!completed) return theme.colors.outline;
-    return type === 'bouldering' ? '#E67E22' : '#3498DB';
+  const getGradeColor = (climbingType: ClimbingType, result: AttemptResult): string => {
+    const isSuccess = ['Send', 'Flash', 'Onsight', 'Redpoint'].includes(result);
+    if (!isSuccess) return theme.colors.outline;
+    return climbingType === 'Bouldering' ? '#E67E22' : '#3498DB';
   };
 
   const formatDuration = (minutes: number): string => {
@@ -123,11 +150,12 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
   }
 
   const session = currentSession;
+  const climbs = currentSessionClimbs || [];
   const stats = {
-    totalClimbs: session.climbs?.length || 0,
-    completed: session.climbs?.filter((c) => c.completed).length || 0,
-    boulders: session.climbs?.filter((c) => c.type === 'bouldering').length || 0,
-    routes: session.climbs?.filter((c) => c.type !== 'bouldering').length || 0,
+    totalClimbs: climbs.length,
+    completed: climbs.filter((c) => ['Send', 'Flash', 'Onsight', 'Redpoint'].includes(c.result)).length,
+    boulders: climbs.filter((c) => c.climbingType === 'Bouldering').length,
+    routes: climbs.filter((c) => c.climbingType !== 'Bouldering').length,
   };
 
   return (
@@ -263,45 +291,48 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
             Climbs ({stats.totalClimbs})
           </Text>
 
-          {session.climbs && session.climbs.length > 0 ? (
-            session.climbs.map((climb, index) => (
-              <Card key={climb.id || index} style={styles.climbCard}>
-                <View style={styles.climbContent}>
-                  <View
-                    style={[
-                      styles.gradeIndicator,
-                      { backgroundColor: getGradeColor(climb.type, climb.completed) },
-                    ]}
-                  >
-                    <Text style={styles.gradeText}>{climb.grade}</Text>
-                  </View>
-                  <View style={styles.climbInfo}>
-                    <View style={styles.climbHeader}>
-                      <Chip compact style={styles.typeChip}>
-                        {CLIMBING_TYPES.find((t) => t.value === climb.type)?.label || climb.type}
-                      </Chip>
-                      {climb.completed ? (
-                        <MaterialCommunityIcons
-                          name="check-circle"
-                          size={20}
-                          color={theme.colors.primary}
-                        />
-                      ) : (
-                        <MaterialCommunityIcons
-                          name="close-circle-outline"
-                          size={20}
-                          color={theme.colors.outline}
-                        />
-                      )}
+          {climbs.length > 0 ? (
+            climbs.map((climb, index) => {
+              const isSuccess = ['Send', 'Flash', 'Onsight', 'Redpoint'].includes(climb.result);
+              return (
+                <Card key={climb.id || index} style={styles.climbCard}>
+                  <View style={styles.climbContent}>
+                    <View
+                      style={[
+                        styles.gradeIndicator,
+                        { backgroundColor: getGradeColor(climb.climbingType, climb.result) },
+                      ]}
+                    >
+                      <Text style={styles.gradeText}>{climb.grade}</Text>
                     </View>
-                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                      {climb.attempts} attempt{climb.attempts !== 1 ? 's' : ''}
-                      {climb.notes && ` • ${climb.notes}`}
-                    </Text>
+                    <View style={styles.climbInfo}>
+                      <View style={styles.climbHeader}>
+                        <Chip compact style={styles.typeChip}>
+                          {climb.climbingType}
+                        </Chip>
+                        {isSuccess ? (
+                          <MaterialCommunityIcons
+                            name="check-circle"
+                            size={20}
+                            color={theme.colors.primary}
+                          />
+                        ) : (
+                          <MaterialCommunityIcons
+                            name="close-circle-outline"
+                            size={20}
+                            color={theme.colors.outline}
+                          />
+                        )}
+                      </View>
+                      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                        {climb.attempts} attempt{climb.attempts !== 1 ? 's' : ''} • {climb.result}
+                        {climb.notes && ` • ${climb.notes}`}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </Card>
-            ))
+                </Card>
+              );
+            })
           ) : (
             <EmptyState
               icon="hiking"
@@ -338,12 +369,16 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
           <View style={styles.typeButtons}>
             {CLIMBING_TYPES.map((type) => (
               <Chip
-                key={type.value}
-                selected={newClimb.type === type.value}
-                onPress={() => setNewClimb({ ...newClimb, type: type.value as ClimbingType })}
+                key={type}
+                selected={newClimb.climbingType === type}
+                onPress={() => {
+                  const newGradeSystem = type === 'Bouldering' ? 'v-scale' : 'yds';
+                  setGradeSystem(newGradeSystem);
+                  setNewClimb({ ...newClimb, climbingType: type as ClimbingType, gradeSystem: newGradeSystem });
+                }}
                 style={styles.typeButton}
               >
-                {type.label}
+                {type}
               </Chip>
             ))}
           </View>
@@ -353,9 +388,9 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
             Grade
           </Text>
           <GradePicker
-            type={newClimb.type === 'bouldering' ? 'boulder' : 'rope'}
+            gradeSystem={gradeSystem}
             value={newClimb.grade || ''}
-            onChange={(grade) => setNewClimb({ ...newClimb, grade })}
+            onValueChange={(grade) => setNewClimb({ ...newClimb, grade })}
           />
 
           {/* Attempts */}
@@ -366,29 +401,39 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
             <IconButton
               icon="minus"
               mode="contained"
-              onPress={() => setNewClimb({ ...newClimb, attempts: Math.max(1, (newClimb.attempts || 1) - 1) })}
+              onPress={() => {
+                const current = parseInt(newClimb.attempts || '1', 10);
+                setNewClimb({ ...newClimb, attempts: String(Math.max(1, current - 1)) });
+              }}
             />
             <Text variant="headlineSmall" style={{ color: theme.colors.onSurface }}>
-              {newClimb.attempts || 1}
+              {newClimb.attempts || '1'}
             </Text>
             <IconButton
               icon="plus"
               mode="contained"
-              onPress={() => setNewClimb({ ...newClimb, attempts: (newClimb.attempts || 1) + 1 })}
+              onPress={() => {
+                const current = parseInt(newClimb.attempts || '1', 10);
+                setNewClimb({ ...newClimb, attempts: String(current + 1) });
+              }}
             />
           </View>
 
-          {/* Completed Toggle */}
-          <View style={styles.completedRow}>
-            <Text variant="bodyLarge" style={{ color: theme.colors.onSurface }}>
-              Completed
-            </Text>
-            <Chip
-              selected={newClimb.completed}
-              onPress={() => setNewClimb({ ...newClimb, completed: !newClimb.completed })}
-            >
-              {newClimb.completed ? 'Yes' : 'No'}
-            </Chip>
+          {/* Result */}
+          <Text variant="labelLarge" style={[styles.label, { color: theme.colors.onSurface }]}>
+            Result
+          </Text>
+          <View style={styles.typeButtons}>
+            {ATTEMPT_RESULTS.map((result) => (
+              <Chip
+                key={result}
+                selected={newClimb.result === result}
+                onPress={() => setNewClimb({ ...newClimb, result: result as AttemptResult })}
+                style={styles.typeButton}
+              >
+                {result}
+              </Chip>
+            ))}
           </View>
 
           {/* Actions */}
@@ -397,16 +442,14 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
               variant="outline"
               onPress={() => setAddClimbModalVisible(false)}
               style={styles.modalButton}
-            >
-              Cancel
-            </Button>
+              title="Cancel"
+            />
             <Button
               variant="primary"
               onPress={handleAddClimb}
               style={styles.modalButton}
-            >
-              Add Climb
-            </Button>
+              title="Add Climb"
+            />
           </View>
         </Modal>
       </Portal>

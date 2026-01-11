@@ -1,7 +1,6 @@
 // Match Store - Climber matching state management
 import { create } from 'zustand';
 import {
-  searchClimbers,
   sendMatchRequest,
   acceptMatchRequest,
   rejectMatchRequest,
@@ -12,6 +11,7 @@ import {
   getMatchStatus,
   calculateCompatibility,
 } from '../services/matchService';
+import { searchClimbers } from '../services/profileService';
 import { ClimberProfile, ClimberMatch, ClimberSearchFilters } from '../types';
 
 interface MatchState {

@@ -8,6 +8,7 @@ import { Card, Avatar, Button, LoadingSpinner, EmptyState, ChipSelector } from '
 import { useAuthStore, useMatchStore } from '../../store';
 import { ClimberProfile, ClimberSearchFilters } from '../../types';
 import { CLIMBING_TYPES, EXPERIENCE_LEVELS } from '../../constants';
+import { showAlert } from '../../utils/alert';
 
 interface DiscoverScreenProps {
   navigation: any;
@@ -32,6 +33,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   const [showFilters, setShowFilters] = useState(false);
   const [tempFilters, setTempFilters] = useState<ClimberSearchFilters>(filters);
   const [sendingRequestTo, setSendingRequestTo] = useState<string | null>(null);
+  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -71,8 +73,19 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   const handleSendRequest = async (targetUserId: string) => {
     if (!user) return;
     setSendingRequestTo(targetUserId);
-    await sendRequest(user.uid, targetUserId);
-    setSendingRequestTo(null);
+    try {
+      const success = await sendRequest(user.uid, targetUserId);
+      if (success) {
+        setSentRequests(prev => new Set(prev).add(targetUserId));
+        showAlert('Request Sent!', 'Your connection request has been sent.');
+      } else {
+        showAlert('Request Failed', 'Could not send connection request. You may have already sent a request to this climber.');
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to send connection request.');
+    } finally {
+      setSendingRequestTo(null);
+    }
   };
 
   const handleViewProfile = (climber: ClimberProfile) => {
@@ -172,9 +185,10 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
             style={styles.actionButton}
           />
           <Button
-            title="Connect"
+            title={sentRequests.has(item.uid) ? "Requested" : "Connect"}
             onPress={() => handleSendRequest(item.uid)}
             loading={sendingRequestTo === item.uid}
+            disabled={sentRequests.has(item.uid)}
             size="small"
             style={styles.actionButton}
           />

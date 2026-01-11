@@ -3,9 +3,9 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from 'react-native-paper';
 import { MainTabNavigator } from './MainTabNavigator';
-import { NewSessionScreen, SessionDetailScreen } from '../screens/session';
+import { NewSessionScreen, SessionDetailScreen, EditSessionScreen } from '../screens/session';
 import { ChatScreen } from '../screens/chat';
-import { EditProfileScreen } from '../screens/profile';
+import { EditProfileScreen, ClimberProfileScreen } from '../screens/profile';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -27,8 +27,14 @@ export const RootNavigator: React.FC = () => {
         component={NewSessionScreen}
         options={{ presentation: 'modal' }}
       />
-      <Stack.Screen name="SessionDetail" component={SessionDetailScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="SessionDetail" component={SessionDetailScreen as React.ComponentType<{}>} />
+      <Stack.Screen
+        name="EditSession"
+        component={EditSessionScreen as React.ComponentType<{}>}
+        options={{ presentation: 'modal' }}
+      />
+      <Stack.Screen name="Chat" component={ChatScreen as React.ComponentType<{}>} />
+      <Stack.Screen name="ClimberProfile" component={ClimberProfileScreen as React.ComponentType<{}>} />
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}

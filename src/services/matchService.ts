@@ -12,6 +12,7 @@ import {
   orderBy,
   limit,
   or,
+  and,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -237,10 +238,12 @@ export const getAcceptedMatches = async (
     // Query for matches where user is either the sender or receiver
     const q = query(
       collection(db, COLLECTIONS.MATCHES),
-      where('status', '==', MATCH_STATUS.ACCEPTED),
-      or(
-        where('userId', '==', userId),
-        where('matchedUserId', '==', userId)
+      and(
+        where('status', '==', MATCH_STATUS.ACCEPTED),
+        or(
+          where('userId', '==', userId),
+          where('matchedUserId', '==', userId)
+        )
       )
     );
     

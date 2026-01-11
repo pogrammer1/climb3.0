@@ -4,6 +4,7 @@ import { StyleSheet, View, FlatList } from 'react-native';
 import { Text, useTheme, FAB, Searchbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Card, LoadingSpinner, EmptyState } from '../../components/common';
 import { useAuthStore, useSessionStore } from '../../store';
 import { ClimbingSession } from '../../types';
@@ -27,11 +28,14 @@ export const SessionsScreen: React.FC<SessionsScreenProps> = ({ navigation }) =>
 
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  useEffect(() => {
-    if (user) {
-      fetchSessions(user.uid, true);
-    }
-  }, [user]);
+  // Refresh sessions when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchSessions(user.uid, true);
+      }
+    }, [user])
+  );
 
   const handleRefresh = useCallback(() => {
     if (user) {
@@ -61,7 +65,7 @@ export const SessionsScreen: React.FC<SessionsScreenProps> = ({ navigation }) =>
             { backgroundColor: item.locationType === 'indoor' ? '#048A8120' : '#FF6B3520' }
           ]}>
             <MaterialCommunityIcons
-              name={item.locationType === 'indoor' ? 'office-building' : 'mountain'}
+              name={item.locationType === 'indoor' ? 'office-building' : 'terrain'}
               size={16}
               color={item.locationType === 'indoor' ? '#048A81' : '#FF6B35'}
             />

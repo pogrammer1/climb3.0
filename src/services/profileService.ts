@@ -230,22 +230,13 @@ export const searchClimbers = async (
   lastDoc?: DocumentSnapshot
 ): Promise<ApiResponse<PaginatedResponse<ClimberProfile>>> => {
   try {
+    // Simple query - just get all profiles and filter in memory
+    // This avoids Firestore composite index requirements
     let q = query(
       collection(db, COLLECTIONS.PROFILES),
-      where('isSearchable', '==', true),
-      where('isProfileComplete', '==', true),
       orderBy('updatedAt', 'desc'),
-      limit(PAGINATION.CLIMBERS_PER_PAGE)
+      limit(50) // Get more and filter in memory
     );
-    
-    // Add filters
-    if (filters.experienceLevels && filters.experienceLevels.length > 0) {
-      q = query(q, where('experienceLevel', 'in', filters.experienceLevels));
-    }
-    
-    if (filters.climbingTypes && filters.climbingTypes.length > 0) {
-      q = query(q, where('climbingTypes', 'array-contains-any', filters.climbingTypes));
-    }
     
     // Handle pagination
     if (lastDoc) {
@@ -254,20 +245,45 @@ export const searchClimbers = async (
     
     const querySnapshot = await getDocs(q);
     
-    const climbers: ClimberProfile[] = [];
+    console.log('Search found', querySnapshot.size, 'profiles');
+    
+    let climbers: ClimberProfile[] = [];
     let lastVisible: DocumentSnapshot | null = null;
     
     querySnapshot.forEach((docSnap) => {
+      // Exclude current user
       if (docSnap.id !== currentUserId) {
         const data = docSnap.data();
-        climbers.push({
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-        } as ClimberProfile);
+        
+        // Only include searchable profiles (but be lenient with isProfileComplete for now)
+        const isSearchable = data.isSearchable !== false; // Default to true if not set
+        
+        if (isSearchable) {
+          climbers.push({
+            uid: docSnap.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date(),
+          } as ClimberProfile);
+        }
         lastVisible = docSnap;
       }
     });
+    
+    console.log('After filtering:', climbers.length, 'climbers');
+    
+    // Apply filters in memory
+    if (filters.experienceLevels && filters.experienceLevels.length > 0) {
+      climbers = climbers.filter(c => 
+        filters.experienceLevels!.includes(c.experienceLevel)
+      );
+    }
+    
+    if (filters.climbingTypes && filters.climbingTypes.length > 0) {
+      climbers = climbers.filter(c => 
+        c.climbingTypes?.some(type => filters.climbingTypes!.includes(type))
+      );
+    }
     
     // Calculate distance if user location provided
     if (filters.location) {
@@ -291,7 +307,7 @@ export const searchClimbers = async (
           success: true,
           data: {
             items: filtered,
-            hasMore: querySnapshot.size === PAGINATION.CLIMBERS_PER_PAGE,
+            hasMore: querySnapshot.size >= 50,
             lastDoc: lastVisible,
           },
         };

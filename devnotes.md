@@ -5,6 +5,11 @@
 - beware of firebase configs accidently pushed onto non gitignore file, change configs later when repo public
 - server startup fixed but server not working in some aspects, need to test and fix features
 
+1/11/26
+- gon work on discover feature mainly today. maybe theme/colors of the website too
+- seems like index.ts in types updates the website correctly, check here if features don't update. 
+- firestone.rules is necessary for updating also
+
 
 
 troubleshooting
@@ -14,6 +19,10 @@ troubleshooting
 
 1/10/26
 1. server starts fine but nothing display on local host
+
+1/11/26
+1. editing past session bug, session time/date bug, climbers not showing up in discover. 
+2. climbers show up but can't message or view profile. can edit session now but date/time is still bugged, and can't add additional details
 
 
 

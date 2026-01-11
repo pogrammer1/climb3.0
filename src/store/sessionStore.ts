@@ -210,6 +210,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         set((state) => ({
           currentSessionClimbs: [...state.currentSessionClimbs, result.data!],
         }));
+        // Refresh the session to update climb count and other stats
+        await get().fetchSession(sessionId);
         return result.data;
       }
       return null;

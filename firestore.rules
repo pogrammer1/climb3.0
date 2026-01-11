@@ -56,6 +56,18 @@ service cloud.firestore {
                               resource.data.userId == request.auth.uid;
     }
     
+    // Climbs collection (individual climbs within sessions)
+    match /climbs/{climbId} {
+      // Users can read climbs from their sessions
+      allow read: if isAuthenticated();
+      
+      // Users can create climbs for their sessions
+      allow create: if isAuthenticated();
+      
+      // Users can update/delete climbs
+      allow update, delete: if isAuthenticated();
+    }
+    
     // Matches collection
     match /matches/{matchId} {
       // Users can read matches where they are involved

@@ -1,9 +1,10 @@
 // Home Screen - Dashboard
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, RefreshControl } from 'react-native';
 import { Text, useTheme, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Card, Avatar, Button, LoadingSpinner } from '../../components/common';
 import { useAuthStore, useSessionStore, useMatchStore } from '../../store';
 
@@ -19,13 +20,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const [refreshing, setRefreshing] = React.useState(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchSessions(user.uid);
-      fetchStats(user.uid);
-      fetchPendingRequests(user.uid);
-    }
-  }, [user]);
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchSessions(user.uid);
+        fetchStats(user.uid);
+        fetchPendingRequests(user.uid);
+      }
+    }, [user])
+  );
 
   const onRefresh = async () => {
     if (!user) return;
@@ -105,7 +109,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {/* Pending Requests Banner */}
         {pendingRequests.length > 0 && (
           <Card
-            style={[styles.requestsBanner, { backgroundColor: theme.colors.primaryContainer }]}
+            style={StyleSheet.flatten([styles.requestsBanner, { backgroundColor: theme.colors.primaryContainer }])}
             onPress={() => navigation.navigate('MatchRequests')}
           >
             <View style={styles.bannerContent}>

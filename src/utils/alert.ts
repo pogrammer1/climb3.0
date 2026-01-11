@@ -21,8 +21,9 @@ export const showAlert = (
       // If we have multiple buttons, use confirm dialog
       const confirmed = window.confirm(`${title}\n\n${message || ''}`);
       if (confirmed) {
-        // Find the non-cancel button and call its onPress
-        const confirmButton = buttons.find(b => b.style !== 'cancel');
+        // Find the destructive or non-cancel button and call its onPress
+        const confirmButton = buttons.find(b => b.style === 'destructive') || 
+                              buttons.find(b => b.style !== 'cancel');
         confirmButton?.onPress?.();
       } else {
         // Find the cancel button and call its onPress

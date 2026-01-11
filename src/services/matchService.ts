@@ -23,6 +23,8 @@ import {
   ApiResponse,
   MatchStatus,
 } from '../types';
+import { getOrCreateConversation } from './messageService';
+import { getProfile } from './profileService';
 
 /**
  * Send a match request to another climber
@@ -74,21 +76,57 @@ export const sendMatchRequest = async (
 };
 
 /**
- * Accept a match request
+ * Accept a match request and create a conversation
  */
 export const acceptMatchRequest = async (
   matchId: string
-): Promise<ApiResponse<null>> => {
+): Promise<ApiResponse<{ conversationId?: string }>> => {
   try {
     const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
+    const matchSnap = await getDoc(matchRef);
     
+    if (!matchSnap.exists()) {
+      return {
+        success: false,
+        error: 'Match request not found',
+      };
+    }
+    
+    const matchData = matchSnap.data();
+    const requesterId = matchData.userId; // The person who sent the request
+    const accepterId = matchData.matchedUserId; // The person accepting
+    
+    // Update match status
     await updateDoc(matchRef, {
       status: MATCH_STATUS.ACCEPTED,
       updatedAt: serverTimestamp(),
     });
     
+    // Get both user profiles to create conversation
+    const [requesterResult, accepterResult] = await Promise.all([
+      getProfile(requesterId),
+      getProfile(accepterId),
+    ]);
+    
+    let conversationId: string | undefined;
+    
+    // Create a conversation between the two users
+    if (requesterResult.success && requesterResult.data && accepterResult.success && accepterResult.data) {
+      const convoResult = await getOrCreateConversation(
+        accepterId,
+        requesterId,
+        requesterResult.data.displayName,
+        requesterResult.data.photoURL || null
+      );
+      
+      if (convoResult.success && convoResult.data) {
+        conversationId = convoResult.data.id;
+      }
+    }
+    
     return {
       success: true,
+      data: { conversationId },
       message: 'Match request accepted',
     };
   } catch (error: any) {

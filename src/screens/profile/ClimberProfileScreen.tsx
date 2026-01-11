@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Avatar, Button, LoadingSpinner, EmptyState } from '../../components/common';
 import { useAuthStore, useMatchStore } from '../../store';
 import { getProfile } from '../../services/profileService';
+import { getOrCreateConversation } from '../../services/messageService';
 import { ClimberProfile } from '../../types';
 import { showAlert } from '../../utils/alert';
 
@@ -23,16 +24,25 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
   const { climberId } = route.params;
   const theme = useTheme();
   const { user } = useAuthStore();
-  const { sendRequest, getCompatibilityScore } = useMatchStore();
+  const { sendRequest, getCompatibilityScore, acceptedMatches, fetchAcceptedMatches } = useMatchStore();
   const { profile: myProfile } = useAuthStore();
 
   const [climber, setClimber] = useState<ClimberProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sendingRequest, setSendingRequest] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
+
+  // Check if already connected with this climber
+  const isConnected = acceptedMatches.some(
+    (match) => match.userId === climberId || match.matchedUserId === climberId
+  );
 
   useEffect(() => {
     loadProfile();
-  }, [climberId]);
+    if (user) {
+      fetchAcceptedMatches(user.uid);
+    }
+  }, [climberId, user]);
 
   const loadProfile = async () => {
     setIsLoading(true);
@@ -65,9 +75,33 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
     }
   };
 
-  const handleMessage = () => {
-    // For now, show an alert that this requires being connected first
-    showAlert('Connect First', 'You need to connect with this climber before you can message them.');
+  const handleMessage = async () => {
+    if (!isConnected) {
+      showAlert('Connect First', 'You need to connect with this climber before you can message them.');
+      return;
+    }
+    
+    if (!user || !climber) return;
+    
+    setOpeningChat(true);
+    try {
+      const result = await getOrCreateConversation(
+        user.uid,
+        climber.uid,
+        climber.displayName,
+        climber.photoURL || null
+      );
+      if (result.success && result.data) {
+        navigation.navigate('Chat', { conversationId: result.data.id });
+      } else {
+        showAlert('Error', 'Could not open conversation.');
+      }
+    } catch (error) {
+      console.error('Error opening chat:', error);
+      showAlert('Error', 'Failed to open conversation.');
+    } finally {
+      setOpeningChat(false);
+    }
   };
 
   if (isLoading) {
@@ -227,17 +261,30 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
 
         {/* Action Buttons */}
         <View style={styles.actions}>
-          <Button
-            title="Connect"
-            onPress={handleSendRequest}
-            loading={sendingRequest}
-            style={styles.actionButton}
-          />
+          {isConnected ? (
+            <Button
+              title="Connected"
+              onPress={() => {}}
+              disabled
+              variant="outline"
+              style={styles.actionButton}
+              icon="check"
+            />
+          ) : (
+            <Button
+              title="Connect"
+              onPress={handleSendRequest}
+              loading={sendingRequest}
+              style={styles.actionButton}
+            />
+          )}
           <Button
             title="Message"
             onPress={handleMessage}
-            variant="outline"
+            loading={openingChat}
+            variant={isConnected ? 'primary' : 'outline'}
             style={styles.actionButton}
+            icon="message-text"
           />
         </View>
       </ScrollView>

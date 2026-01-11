@@ -27,6 +27,7 @@ export type RootStackParamList = {
   EditProfile: undefined;
   MatchProfile: { matchId: string };
   ClimberProfile: { climberId: string };
+  MatchRequests: undefined;
   Settings: undefined;
 };
 

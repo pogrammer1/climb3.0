@@ -57,6 +57,14 @@
         { "fieldPath": "isPublic", "order": "ASCENDING" },
         { "fieldPath": "experienceLevel", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "climbs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "sessionId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

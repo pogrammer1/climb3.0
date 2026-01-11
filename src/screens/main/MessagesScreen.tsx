@@ -3,6 +3,7 @@ import React, { useEffect, useCallback } from 'react';
 import { StyleSheet, View, FlatList, Pressable } from 'react-native';
 import { Text, useTheme, Badge } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Avatar, LoadingSpinner, EmptyState } from '../../components/common';
 import { useAuthStore, useMessageStore } from '../../store';
@@ -24,9 +25,17 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({ navigation }) =>
     cleanup,
   } = useMessageStore();
 
+  // Refresh conversations when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchConversations(user.uid);
+      }
+    }, [user])
+  );
+
   useEffect(() => {
     if (user) {
-      fetchConversations(user.uid);
       subscribeToUserConversations(user.uid);
     }
 

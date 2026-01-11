@@ -68,7 +68,7 @@ export const getOrCreateConversation = async (
         },
       },
       lastMessage: null,
-      lastMessageAt: null,
+      lastMessageAt: serverTimestamp(), // Set to creation time so it appears in queries
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };

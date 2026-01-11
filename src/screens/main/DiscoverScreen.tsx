@@ -1,14 +1,28 @@
 // Discover Screen - Find and match with other climbers
 import React, { useEffect, useCallback, useState } from 'react';
-import { StyleSheet, View, FlatList, Image } from 'react-native';
-import { Text, useTheme, Chip, Searchbar, IconButton, Modal, Portal } from 'react-native-paper';
+import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
+import { Text, useTheme, Chip, IconButton, Modal, Portal, Badge, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Avatar, Button, LoadingSpinner, EmptyState, ChipSelector } from '../../components/common';
 import { useAuthStore, useMatchStore } from '../../store';
-import { ClimberProfile, ClimberSearchFilters } from '../../types';
+import { ClimberProfile, ClimberSearchFilters, UserProfile } from '../../types';
 import { CLIMBING_TYPES, EXPERIENCE_LEVELS } from '../../constants';
 import { showAlert } from '../../utils/alert';
+import { getProfile } from '../../services/profileService';
+import { getOrCreateConversation } from '../../services/messageService';
+
+interface PendingRequestWithProfile {
+  id: string;
+  odId: string;
+  profile: UserProfile | null;
+}
+
+interface ConnectedUserWithProfile {
+  odId: string;
+  profile: UserProfile | null;
+}
 
 interface DiscoverScreenProps {
   navigation: any;
@@ -19,12 +33,16 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   const { user, profile: myProfile } = useAuthStore();
   const {
     discoveredClimbers,
+    pendingRequests,
+    sentRequests: storeSentRequests,
+    acceptedMatches,
+    matchedProfiles,
     isLoading,
-    isLoadingMore,
-    hasMore,
     filters,
     fetchClimbers,
-    loadMoreClimbers,
+    fetchPendingRequests,
+    fetchAcceptedMatches,
+    fetchMatchedProfiles,
     setFilters,
     sendRequest,
     getCompatibilityScore,
@@ -34,24 +52,87 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   const [tempFilters, setTempFilters] = useState<ClimberSearchFilters>(filters);
   const [sendingRequestTo, setSendingRequestTo] = useState<string | null>(null);
   const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
+  const [connectedUserIds, setConnectedUserIds] = useState<Set<string>>(new Set());
+  const [pendingWithProfiles, setPendingWithProfiles] = useState<PendingRequestWithProfile[]>([]);
+  const [connectedWithProfiles, setConnectedWithProfiles] = useState<ConnectedUserWithProfile[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchClimbers(user.uid, true);
+        fetchPendingRequests(user.uid);
+        fetchAcceptedMatches(user.uid);
+        fetchMatchedProfiles(user.uid);
+      }
+    }, [user])
+  );
+
+  // Track sent requests from store
   useEffect(() => {
-    if (user) {
-      fetchClimbers(user.uid, true);
-    }
-  }, [user]);
+    const sent = new Set(storeSentRequests.map(r => r.matchedUserId));
+    setSentRequests(sent);
+  }, [storeSentRequests]);
 
-  const handleRefresh = useCallback(() => {
-    if (user) {
-      fetchClimbers(user.uid, true);
-    }
-  }, [user, fetchClimbers]);
+  // Track connected users from accepted matches
+  useEffect(() => {
+    const connected = new Set<string>();
+    acceptedMatches.forEach(match => {
+      if (match.userId !== user?.uid) connected.add(match.userId);
+      if (match.matchedUserId !== user?.uid) connected.add(match.matchedUserId);
+    });
+    setConnectedUserIds(connected);
+  }, [acceptedMatches, user]);
 
-  const handleLoadMore = useCallback(() => {
-    if (user && hasMore && !isLoadingMore) {
-      loadMoreClimbers(user.uid);
-    }
-  }, [user, hasMore, isLoadingMore, loadMoreClimbers]);
+  // Fetch profiles for pending requests
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (pendingRequests.length === 0) {
+        setPendingWithProfiles([]);
+        return;
+      }
+
+      const withProfiles = await Promise.all(
+        pendingRequests.map(async (request) => {
+          try {
+            const result = await getProfile(request.userId);
+            return {
+              id: request.id,
+              odId: request.userId,
+              profile: result.success && result.data ? result.data : null,
+            };
+          } catch {
+            return { id: request.id, odId: request.userId, profile: null };
+          }
+        })
+      );
+      setPendingWithProfiles(withProfiles);
+    };
+
+    fetchProfiles();
+  }, [pendingRequests]);
+
+  // Set connected profiles from matchedProfiles store
+  useEffect(() => {
+    const profiles = matchedProfiles.map(p => ({
+      odId: p.uid,
+      profile: p as unknown as UserProfile,
+    }));
+    setConnectedWithProfiles(profiles);
+  }, [matchedProfiles]);
+
+  const handleRefresh = async () => {
+    if (!user) return;
+    setRefreshing(true);
+    await Promise.all([
+      fetchClimbers(user.uid, true),
+      fetchPendingRequests(user.uid),
+      fetchAcceptedMatches(user.uid),
+      fetchMatchedProfiles(user.uid),
+    ]);
+    setRefreshing(false);
+  };
 
   const handleApplyFilters = () => {
     setFilters(tempFilters);
@@ -88,23 +169,46 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
     }
   };
 
-  const handleViewProfile = (climber: ClimberProfile) => {
-    navigation.navigate('ClimberProfile', { climberId: climber.uid });
+  const handleViewProfile = (climberId: string) => {
+    navigation.navigate('ClimberProfile', { climberId });
   };
 
-  const renderClimberCard = ({ item }: { item: ClimberProfile }) => {
+  const handleMessageUser = async (otherUserId: string, otherUserName: string, otherUserPhoto: string | null) => {
+    if (!user) return;
+    try {
+      const result = await getOrCreateConversation(user.uid, otherUserId, otherUserName, otherUserPhoto);
+      if (result.success && result.data) {
+        navigation.navigate('Chat', { conversationId: result.data.id });
+      } else {
+        showAlert('Error', 'Could not open conversation.');
+      }
+    } catch (error) {
+      console.error('Error opening conversation:', error);
+      showAlert('Error', 'Failed to open conversation.');
+    }
+  };
+
+  const activeFiltersCount =
+    (tempFilters.experienceLevels?.length || 0) +
+    (tempFilters.climbingTypes?.length || 0);
+
+  // Filter out connected users from discovered climbers
+  const newClimbers = discoveredClimbers.filter(c => !connectedUserIds.has(c.uid));
+
+  const renderClimberCard = (item: ClimberProfile, isConnected: boolean = false) => {
     const compatibilityScore = myProfile ? getCompatibilityScore(myProfile, item) : 0;
 
     return (
-      <Card style={styles.climberCard}>
+      <Card key={item.uid} style={styles.climberCard}>
         <View style={styles.cardHeader}>
           <Avatar
             source={item.photoURL}
             name={item.displayName}
-            size={64}
+            size={56}
+            onPress={() => handleViewProfile(item.uid)}
           />
           <View style={styles.headerInfo}>
-            <Text variant="titleLarge" style={{ color: theme.colors.onBackground }}>
+            <Text variant="titleMedium" style={{ color: theme.colors.onBackground }}>
               {item.displayName}
             </Text>
             <View style={styles.locationRow}>
@@ -116,101 +220,70 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
                   </Text>
                 </>
               )}
-              {item.distance !== undefined && (
-                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 8 }}>
-                  • {item.distance} km away
-                </Text>
-              )}
             </View>
+            {item.experienceLevel && (
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                {item.experienceLevel} • {item.yearsClimbing || 0} yrs
+              </Text>
+            )}
           </View>
           {compatibilityScore > 0 && (
             <View style={[styles.compatBadge, { backgroundColor: theme.colors.primaryContainer }]}>
               <Text variant="labelSmall" style={{ color: theme.colors.onPrimaryContainer }}>
-                {compatibilityScore}% match
+                {compatibilityScore}%
               </Text>
             </View>
-          )}
-        </View>
-
-        <Text
-          variant="bodyMedium"
-          style={{ color: theme.colors.onSurfaceVariant, marginVertical: 12 }}
-          numberOfLines={2}
-        >
-          {item.bio || 'No bio yet'}
-        </Text>
-
-        <View style={styles.tagsContainer}>
-          <Chip compact style={styles.tag}>
-            {item.experienceLevel}
-          </Chip>
-          {item.yearsClimbing > 0 && (
-            <Chip compact style={styles.tag}>
-              {item.yearsClimbing} yrs
-            </Chip>
-          )}
-          {item.highestGradeYDS && (
-            <Chip compact style={styles.tag}>
-              {item.highestGradeYDS}
-            </Chip>
-          )}
-          {item.highestGradeBouldering && (
-            <Chip compact style={styles.tag}>
-              {item.highestGradeBouldering}
-            </Chip>
-          )}
-        </View>
-
-        <View style={styles.climbingTypes}>
-          {item.climbingTypes.slice(0, 3).map((type) => (
-            <View key={type} style={[styles.typeBadge, { backgroundColor: theme.colors.surfaceVariant }]}>
-              <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                {type}
-              </Text>
-            </View>
-          ))}
-          {item.climbingTypes.length > 3 && (
-            <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              +{item.climbingTypes.length - 3} more
-            </Text>
           )}
         </View>
 
         <View style={styles.cardActions}>
           <Button
-            title="View Profile"
-            onPress={() => handleViewProfile(item)}
+            title="Profile"
+            onPress={() => handleViewProfile(item.uid)}
             variant="outline"
             size="small"
             style={styles.actionButton}
           />
-          <Button
-            title={sentRequests.has(item.uid) ? "Requested" : "Connect"}
-            onPress={() => handleSendRequest(item.uid)}
-            loading={sendingRequestTo === item.uid}
-            disabled={sentRequests.has(item.uid)}
-            size="small"
-            style={styles.actionButton}
-          />
+          {isConnected ? (
+            <Button
+              title="Message"
+              onPress={() => navigation.navigate('Messages')}
+              size="small"
+              style={styles.actionButton}
+              icon="message-text"
+            />
+          ) : sentRequests.has(item.uid) ? (
+            <Button
+              title="Requested"
+              onPress={() => {}}
+              disabled
+              size="small"
+              style={styles.actionButton}
+            />
+          ) : (
+            <Button
+              title="Connect"
+              onPress={() => handleSendRequest(item.uid)}
+              loading={sendingRequestTo === item.uid}
+              size="small"
+              style={styles.actionButton}
+            />
+          )}
         </View>
       </Card>
     );
   };
 
-  const renderFooter = () => {
-    if (!isLoadingMore) return null;
-    return <LoadingSpinner size="small" style={styles.footer} />;
-  };
-
-  const activeFiltersCount =
-    (tempFilters.experienceLevels?.length || 0) +
-    (tempFilters.climbingTypes?.length || 0);
+  if (isLoading && discoveredClimbers.length === 0 && connectedWithProfiles.length === 0) {
+    return <LoadingSpinner fullScreen message="Finding climbers near you..." />;
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Header */}
       <View style={styles.header}>
         <Text variant="headlineMedium" style={{ color: theme.colors.onBackground }}>
-          Discover Climbers
+          Discover
         </Text>
         <IconButton
           icon="filter-variant"
@@ -219,42 +292,177 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
         />
       </View>
 
-      {activeFiltersCount > 0 && (
-        <View style={styles.activeFilters}>
-          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active
-          </Text>
-          <Button
-            title="Clear"
-            onPress={handleClearFilters}
-            variant="text"
-            size="small"
-          />
+      <ScrollView 
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Pending Requests Section - Always visible */}
+        <View style={styles.section}>
+          <Pressable 
+            style={styles.sectionHeader}
+            onPress={() => navigation.navigate('MatchRequests')}
+          >
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="account-clock" size={22} color={theme.colors.primary} />
+              <Text variant="titleMedium" style={{ color: theme.colors.onBackground, marginLeft: 8 }}>
+                Pending Requests
+              </Text>
+              {pendingRequests.length > 0 && (
+                <Badge style={{ marginLeft: 8, backgroundColor: theme.colors.error }}>
+                  {pendingRequests.length}
+                </Badge>
+              )}
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
+          </Pressable>
+          
+          {pendingWithProfiles.length === 0 ? (
+            <Pressable 
+              style={[styles.emptySection, { backgroundColor: theme.colors.surfaceVariant }]}
+              onPress={() => navigation.navigate('MatchRequests')}
+            >
+              <MaterialCommunityIcons name="account-clock-outline" size={32} color={theme.colors.onSurfaceVariant} />
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: 'center' }}>
+                No pending requests
+              </Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+                When someone wants to connect, they'll appear here
+              </Text>
+            </Pressable>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {pendingWithProfiles.map((item) => (
+                <Pressable 
+                  key={item.id} 
+                  style={[styles.pendingCard, { backgroundColor: theme.colors.surfaceVariant }]}
+                  onPress={() => navigation.navigate('MatchRequests')}
+                >
+                  <Avatar
+                    source={item.profile?.photoURL}
+                    name={item.profile?.displayName || 'Unknown'}
+                    size={56}
+                  />
+                  <Text 
+                    variant="labelMedium" 
+                    style={{ color: theme.colors.onSurface, marginTop: 8, textAlign: 'center', width: 80 }}
+                    numberOfLines={1}
+                  >
+                    {item.profile?.displayName || 'Unknown'}
+                  </Text>
+                  <Text variant="labelSmall" style={{ color: theme.colors.primary, marginTop: 4 }}>
+                    Respond
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
         </View>
-      )}
 
-      {isLoading && discoveredClimbers.length === 0 ? (
-        <LoadingSpinner fullScreen message="Finding climbers near you..." />
-      ) : discoveredClimbers.length === 0 ? (
-        <EmptyState
-          icon="account-search"
-          title="No Climbers Found"
-          message="Try adjusting your filters or check back later for new climbers in your area."
-        />
-      ) : (
-        <FlatList
-          data={discoveredClimbers}
-          renderItem={renderClimberCard}
-          keyExtractor={(item) => item.uid}
-          contentContainerStyle={styles.list}
-          refreshing={isLoading}
-          onRefresh={handleRefresh}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={renderFooter}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+        <Divider style={styles.divider} />
+
+        {/* Connected Users Section - Always visible */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="account-check" size={22} color={theme.colors.tertiary || theme.colors.secondary} />
+              <Text variant="titleMedium" style={{ color: theme.colors.onBackground, marginLeft: 8 }}>
+                My Connections
+              </Text>
+              {connectedWithProfiles.length > 0 && (
+                <Badge style={{ marginLeft: 8, backgroundColor: theme.colors.tertiary || theme.colors.secondary }}>
+                  {connectedWithProfiles.length}
+                </Badge>
+              )}
+            </View>
+          </View>
+          
+          {connectedWithProfiles.length === 0 ? (
+            <View style={[styles.emptySection, { backgroundColor: theme.colors.surfaceVariant }]}>
+              <MaterialCommunityIcons name="account-multiple-outline" size={32} color={theme.colors.onSurfaceVariant} />
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: 'center' }}>
+                No connections yet
+              </Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+                Connect with climbers below to start chatting
+              </Text>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {connectedWithProfiles.map((item) => (
+                <View key={item.odId} style={[styles.connectedCard, { backgroundColor: theme.colors.secondaryContainer }]}>
+                  <Pressable onPress={() => handleViewProfile(item.odId)}>
+                    <Avatar
+                      source={item.profile?.photoURL}
+                      name={item.profile?.displayName || 'Unknown'}
+                      size={56}
+                    />
+                  </Pressable>
+                  <Pressable onPress={() => handleViewProfile(item.odId)}>
+                    <Text 
+                      variant="labelMedium" 
+                      style={{ color: theme.colors.onSecondaryContainer, marginTop: 8, textAlign: 'center', width: 80 }}
+                      numberOfLines={1}
+                    >
+                      {item.profile?.displayName || 'Unknown'}
+                    </Text>
+                  </Pressable>
+                  <Pressable 
+                    style={styles.messageButton}
+                    onPress={() => handleMessageUser(
+                      item.odId, 
+                      item.profile?.displayName || 'Unknown',
+                      item.profile?.photoURL || null
+                    )}
+                  >
+                    <MaterialCommunityIcons name="message-text" size={14} color={theme.colors.primary} />
+                    <Text variant="labelSmall" style={{ color: theme.colors.primary, marginLeft: 4 }}>
+                      Message
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
+        <Divider style={styles.divider} />
+
+        {/* Find New Climbers Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="account-search" size={22} color={theme.colors.primary} />
+              <Text variant="titleMedium" style={{ color: theme.colors.onBackground, marginLeft: 8 }}>
+                Find New Climbers
+              </Text>
+            </View>
+            {activeFiltersCount > 0 && (
+              <Chip compact onClose={handleClearFilters}>
+                {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
+              </Chip>
+            )}
+          </View>
+
+          {newClimbers.length === 0 ? (
+            <View style={[styles.emptySection, { backgroundColor: theme.colors.surfaceVariant }]}>
+              <MaterialCommunityIcons name="account-search-outline" size={32} color={theme.colors.onSurfaceVariant} />
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: 'center' }}>
+                No new climbers found
+              </Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+                Try adjusting your filters or check back later
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.climbersGrid}>
+              {newClimbers.map((climber) => renderClimberCard(climber, false))}
+            </View>
+          )}
+        </View>
+
+        {/* Bottom padding */}
+        <View style={{ height: 20 }} />
+      </ScrollView>
 
       {/* Filters Modal */}
       <Portal>
@@ -311,24 +519,62 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 8,
   },
-  activeFilters: {
+  scrollView: {
+    flex: 1,
+  },
+  section: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
   },
-  list: {
-    padding: 16,
-    paddingTop: 8,
+  emptySection: {
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  horizontalScroll: {
+    gap: 12,
+    paddingRight: 16,
+  },
+  pendingCard: {
+    width: 100,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  connectedCard: {
+    width: 100,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  messageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  divider: {
+    marginHorizontal: 16,
+  },
+  climbersGrid: {
+    gap: 12,
   },
   climberCard: {
-    marginBottom: 16,
     padding: 16,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    marginBottom: 12,
   },
   headerInfo: {
     flex: 1,
@@ -337,32 +583,12 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
   },
   compatBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 8,
-  },
-  tag: {
-    height: 28,
-  },
-  climbingTypes: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 16,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
   },
   cardActions: {
     flexDirection: 'row',
@@ -371,9 +597,6 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-  },
-  footer: {
-    paddingVertical: 20,
   },
   modal: {
     margin: 20,

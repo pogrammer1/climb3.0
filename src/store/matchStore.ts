@@ -35,7 +35,7 @@ interface MatchState {
   fetchAcceptedMatches: (userId: string) => Promise<void>;
   fetchMatchedProfiles: (userId: string) => Promise<void>;
   sendRequest: (userId: string, targetUserId: string) => Promise<boolean>;
-  acceptRequest: (matchId: string) => Promise<boolean>;
+  acceptRequest: (matchId: string) => Promise<{ success: boolean; conversationId?: string }>;
   rejectRequest: (matchId: string) => Promise<boolean>;
   unmatch: (matchId: string) => Promise<boolean>;
   checkMatchStatus: (userId: string, targetUserId: string) => Promise<{ status: string | null; matchId: string | null }>;
@@ -171,12 +171,12 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         set((state) => ({
           pendingRequests: state.pendingRequests.filter((r) => r.id !== matchId),
         }));
-        return true;
+        return { success: true, conversationId: result.data?.conversationId };
       }
-      return false;
+      return { success: false };
     } catch (error) {
       console.error('Accept match request error:', error);
-      return false;
+      return { success: false };
     }
   },
   

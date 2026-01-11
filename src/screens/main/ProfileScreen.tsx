@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Card, Avatar, Button } from '../../components/common';
-import { useAuthStore } from '../../store';
+import { useAuthStore, useSessionStore, useMatchStore } from '../../store';
 import { signOut } from '../../services/authService';
 import { uploadProfilePhoto, toggleSearchability } from '../../services/profileService';
 import { showAlert } from '../../utils/alert';
@@ -17,7 +17,9 @@ interface ProfileScreenProps {
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const theme = useTheme();
-  const { user, profile, fetchProfile } = useAuthStore();
+  const { user, profile, fetchProfile, clearAuth } = useAuthStore();
+  const { resetStore: resetSessionStore } = useSessionStore();
+  const { clearState: clearMatchState } = useMatchStore();
   const [isUploading, setIsUploading] = useState(false);
   const [isSearchable, setIsSearchable] = useState(profile?.isSearchable ?? true);
 
@@ -69,6 +71,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
+            // Clear all stores before signing out
+            resetSessionStore();
+            clearMatchState();
+            clearAuth();
             await signOut();
           },
         },

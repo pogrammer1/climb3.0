@@ -458,14 +458,23 @@ export const getSessionStats = async (
       }
     });
     
-    // Get all climbs
-    const climbsQuery = query(
-      collection(db, COLLECTIONS.CLIMBS),
-      where('sessionId', 'in', sessionsSnap.docs.map((d) => d.id).slice(0, 10)) // Firestore limit
-    );
-    const climbsSnap = await getDocs(climbsQuery);
+    // Get all climbs (only if there are sessions)
+    let totalClimbs = 0;
+    const sessionIds = sessionsSnap.docs.map((d) => d.id);
     
-    const totalClimbs = climbsSnap.size;
+    if (sessionIds.length > 0) {
+      // Firestore 'in' filter limited to 10 items, need to batch if more
+      const batchSize = 10;
+      for (let i = 0; i < sessionIds.length; i += batchSize) {
+        const batch = sessionIds.slice(i, i + batchSize);
+        const climbsQuery = query(
+          collection(db, COLLECTIONS.CLIMBS),
+          where('sessionId', 'in', batch)
+        );
+        const climbsSnap = await getDocs(climbsQuery);
+        totalClimbs += climbsSnap.size;
+      }
+    }
     
     // Find favorite location
     let favoriteCrag: string | null = null;

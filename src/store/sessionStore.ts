@@ -47,6 +47,7 @@ interface SessionState {
   setFilters: (filters: SessionFilters) => void;
   clearCurrentSession: () => void;
   setError: (error: string | null) => void;
+  resetStore: () => void;
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -260,5 +261,20 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   
   setError: (error) => {
     set({ error });
+  },
+  
+  resetStore: () => {
+    set({
+      sessions: [],
+      currentSession: null,
+      currentSessionClimbs: [],
+      stats: null,
+      isLoading: false,
+      isLoadingMore: false,
+      hasMore: false,
+      error: null,
+      lastDoc: null,
+      filters: {},
+    });
   },
 }));

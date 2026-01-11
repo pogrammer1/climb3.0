@@ -1,6 +1,6 @@
 // Chat Screen - Real-time messaging
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { StyleSheet, View, FlatList, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { StyleSheet, View, FlatList, KeyboardAvoidingView, Platform, Pressable, NativeSyntheticEvent, TextInputKeyPressEventData } from 'react-native';
 import { Text, useTheme, TextInput, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -74,6 +74,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
     setInputText('');
     await sendMessage(conversationId, user.uid, text);
   }, [inputText, user, conversationId, isSending, sendMessage]);
+
+  // Handle Enter key press (without Shift for new line)
+  const handleKeyPress = useCallback((e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+    // On web, check for Enter without Shift
+    if (Platform.OS === 'web') {
+      const nativeEvent = e.nativeEvent as any;
+      if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    }
+  }, [handleSend]);
 
   const formatMessageDate = (date: Date): string => {
     if (isToday(date)) return 'Today';
@@ -200,6 +212,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
             outlineStyle={{ borderRadius: 24 }}
             multiline
             maxLength={1000}
+            blurOnSubmit={false}
+            onKeyPress={handleKeyPress}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
             right={
               <TextInput.Icon
                 icon="send"

@@ -4,7 +4,7 @@ import { StyleSheet, View, ScrollView, Platform, Pressable } from 'react-native'
 import { Text, useTheme, SegmentedButtons, IconButton, Chip, Divider, Portal, Modal } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Button, Input, Card, GradePicker } from '../../components/common';
+import { Button, Input, Card, GradePicker, GymPicker } from '../../components/common';
 import { useAuthStore, useSessionStore } from '../../store';
 import { SessionFormData, ClimbFormData, ClimbingType, AttemptResult } from '../../types';
 import { showAlert } from '../../utils/alert';
@@ -278,13 +278,11 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
           />
 
           {/* Location Name */}
-          <Input
-            label="Location"
+          <GymPicker
             value={formData.location}
-            onChangeText={(text) => setFormData({ ...formData, location: text })}
-            placeholder={formData.locationType === 'indoor' ? 'e.g., Brooklyn Boulders' : 'e.g., Red Rocks'}
+            onSelect={(gymName) => setFormData({ ...formData, location: gymName })}
+            locationType={formData.locationType}
             error={errors.location}
-            leftIcon="map-marker"
           />
 
           {/* Duration */}

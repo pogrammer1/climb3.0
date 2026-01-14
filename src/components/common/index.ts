@@ -7,3 +7,4 @@ export { LoadingSpinner } from './LoadingSpinner';
 export { EmptyState } from './EmptyState';
 export { ChipSelector } from './ChipSelector';
 export { GradePicker } from './GradePicker';
+export { GymPicker } from './GymPicker';

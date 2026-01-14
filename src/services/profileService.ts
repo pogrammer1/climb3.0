@@ -116,6 +116,33 @@ export const saveProfile = async (
 };
 
 /**
+ * Convert image URI to blob (handles web and native differently)
+ */
+const uriToBlob = async (uri: string): Promise<Blob> => {
+  // For web: data URIs or blob URLs work directly with fetch
+  // For native: file:// URIs need XMLHttpRequest
+  if (uri.startsWith('data:') || uri.startsWith('blob:') || uri.startsWith('http')) {
+    const response = await fetch(uri);
+    return await response.blob();
+  }
+  
+  // For file:// URIs on native (React Native)
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      resolve(xhr.response);
+    };
+    xhr.onerror = function (e) {
+      console.error('XHR error:', e);
+      reject(new TypeError('Network request failed'));
+    };
+    xhr.responseType = 'blob';
+    xhr.open('GET', uri, true);
+    xhr.send(null);
+  });
+};
+
+/**
  * Upload profile photo
  */
 export const uploadProfilePhoto = async (
@@ -123,18 +150,33 @@ export const uploadProfilePhoto = async (
   imageUri: string
 ): Promise<ApiResponse<string>> => {
   try {
-    // Convert URI to blob
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
+    console.log('Starting photo upload for user:', userId);
+    console.log('Image URI type:', imageUri.substring(0, 50) + '...');
     
-    // Create storage reference
-    const storageRef = ref(storage, `${STORAGE_PATHS.PROFILE_IMAGES}/${userId}`);
+    // Convert URI to blob with improved handling
+    const blob = await uriToBlob(imageUri);
+    console.log('Blob created, size:', blob.size);
     
-    // Upload file
-    await uploadBytes(storageRef, blob);
+    if (blob.size === 0) {
+      throw new Error('Image blob is empty');
+    }
+    
+    // Create storage reference with file extension
+    const timestamp = Date.now();
+    const storageRef = ref(storage, `${STORAGE_PATHS.PROFILE_IMAGES}/${userId}/profile_${timestamp}.jpg`);
+    
+    // Upload file with metadata
+    const metadata = {
+      contentType: 'image/jpeg',
+    };
+    
+    console.log('Uploading to:', storageRef.fullPath);
+    await uploadBytes(storageRef, blob, metadata);
+    console.log('Upload complete');
     
     // Get download URL
     const downloadURL = await getDownloadURL(storageRef);
+    console.log('Download URL obtained:', downloadURL.substring(0, 50) + '...');
     
     // Update profile with photo URL
     await updateDoc(doc(db, COLLECTIONS.PROFILES, userId), {
@@ -155,9 +197,10 @@ export const uploadProfilePhoto = async (
     };
   } catch (error: any) {
     console.error('Upload photo error:', error);
+    console.error('Error details:', error.code, error.message);
     return {
       success: false,
-      error: 'Failed to upload photo',
+      error: error.message || 'Failed to upload photo',
     };
   }
 };

@@ -10,6 +10,13 @@
 - seems like index.ts in types updates the website correctly, check here if features don't update. 
 - firestone.rules is necessary for updating also
 
+1/14/26
+- change theme to be more modern, some UI tweeks
+- deploy publicly to access outside local network
+- added gym picker component with pre-populated gyms
+- created gymService.ts for Google Places API integration (optional)
+- fixed icon fonts for web deployment
+
 
 
 troubleshooting
@@ -23,6 +30,10 @@ troubleshooting
 1/11/26
 1. editing past session bug, session time/date bug, climbers not showing up in discover. 
 2. climbers show up but can't message or view profile. can edit session now but date/time is still bugged, and can't add additional details
+
+1/14/26
+1. pfp upload feature not working
+2. expo mobile not working
 
 
 

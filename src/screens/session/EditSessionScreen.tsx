@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, Platform } from 'react-native';
 import { Text, useTheme, SegmentedButtons, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input, Card, LoadingSpinner } from '../../components/common';
+import { Button, Input, Card, LoadingSpinner, GymPicker } from '../../components/common';
 import { useSessionStore } from '../../store';
 import { SessionFormData } from '../../types';
 import { showAlert } from '../../utils/alert';
@@ -203,14 +203,11 @@ export const EditSessionScreen: React.FC<EditSessionScreenProps> = ({ navigation
           />
 
           {/* Location Name */}
-          <Input
-            label="Location Name"
+          <GymPicker
             value={formData.location}
-            onChangeText={(text) => setFormData({ ...formData, location: text })}
-            placeholder={formData.locationType === 'indoor' ? 'e.g., Brooklyn Boulders' : 'e.g., Red Rocks'}
+            onSelect={(gymName) => setFormData({ ...formData, location: gymName })}
+            locationType={formData.locationType}
             error={errors.location}
-            leftIcon="map-marker"
-            required
           />
 
           {/* Duration */}

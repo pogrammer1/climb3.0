@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ClimbApp",
-    "slug": "climb-app",
+    "name": "Belay",
+    "slug": "belay-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -45,14 +45,14 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow ClimbApp to use your location to find nearby climbers."
+          "locationAlwaysAndWhenInUsePermission": "Allow Belay to use your location to find nearby climbers."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow ClimbApp to access your photos for your profile.",
-          "cameraPermission": "Allow ClimbApp to access your camera for your profile."
+          "photosPermission": "Allow Belay to access your photos for your profile.",
+          "cameraPermission": "Allow Belay to access your camera for your profile."
         }
       ],
       "expo-font"

@@ -1,7 +1,7 @@
 // Home Screen - Dashboard
 import React, { useEffect, useCallback } from 'react';
-import { StyleSheet, View, ScrollView, RefreshControl } from 'react-native';
-import { Text, useTheme, IconButton } from 'react-native-paper';
+import { StyleSheet, View, ScrollView, RefreshControl, Pressable } from 'react-native';
+import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -42,39 +42,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const QuickActionCard = ({
+  // Modern Quick Action Button
+  const QuickAction = ({
     icon,
-    title,
-    subtitle,
+    label,
     onPress,
     color,
   }: {
     icon: string;
-    title: string;
-    subtitle: string;
+    label: string;
     onPress: () => void;
     color: string;
   }) => (
-    <Card style={styles.actionCard} onPress={onPress}>
-      <View style={[styles.actionIconContainer, { backgroundColor: color + '20' }]}>
-        <MaterialCommunityIcons name={icon as any} size={28} color={color} />
+    <Pressable 
+      onPress={onPress} 
+      style={({ pressed }) => [
+        styles.quickAction,
+        { opacity: pressed ? 0.7 : 1 }
+      ]}
+    >
+      <View style={[styles.quickActionIcon, { backgroundColor: color }]}>
+        <MaterialCommunityIcons name={icon as any} size={22} color="#fff" />
       </View>
-      <Text variant="titleMedium" style={styles.actionTitle}>
-        {title}
+      <Text variant="labelSmall" style={[styles.quickActionLabel, { color: theme.colors.onSurface }]}>
+        {label}
       </Text>
-      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-        {subtitle}
-      </Text>
-    </Card>
+    </Pressable>
   );
 
-  const StatCard = ({ label, value, icon }: { label: string; value: string | number; icon: string }) => (
-    <View style={styles.statCard}>
-      <MaterialCommunityIcons name={icon as any} size={24} color={theme.colors.primary} />
-      <Text variant="headlineSmall" style={[styles.statValue, { color: theme.colors.onBackground }]}>
+  // Stat Item for inline stats bar
+  const StatItem = ({ label, value, icon }: { label: string; value: string | number; icon: string }) => (
+    <View style={styles.statItem}>
+      <MaterialCommunityIcons name={icon as any} size={18} color={theme.colors.primary} />
+      <Text variant="titleMedium" style={[styles.statValue, { color: theme.colors.onSurface }]}>
         {value}
       </Text>
-      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+      <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
         {label}
       </Text>
     </View>
@@ -88,22 +91,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Header */}
+        {/* Header with Stats Bar */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text variant="headlineSmall" style={{ color: theme.colors.onBackground }}>
-              Hey, {profile?.displayName || 'Climber'}! 👋
-            </Text>
-            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-              Ready to climb?
-            </Text>
+          <View style={styles.headerTop}>
+            <View style={styles.headerLeft}>
+              <Text variant="titleLarge" style={[styles.greeting, { color: theme.colors.onBackground }]}>
+                Hey, {profile?.displayName || 'Climber'}!
+              </Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                Ready to climb?
+              </Text>
+            </View>
+            <Avatar
+              source={profile?.photoURL}
+              name={profile?.displayName || ''}
+              size={44}
+              onPress={() => navigation.navigate('Profile')}
+            />
           </View>
-          <Avatar
-            source={profile?.photoURL}
-            name={profile?.displayName || ''}
-            size={48}
-            onPress={() => navigation.navigate('Profile')}
-          />
+          
+          {/* Inline Stats Bar */}
+          <View style={[styles.statsBar, { backgroundColor: theme.colors.surface }]}>
+            <StatItem
+              label="Sessions"
+              value={stats?.totalSessions || 0}
+              icon="calendar-check"
+            />
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.outline }]} />
+            <StatItem
+              label="Climbs"
+              value={stats?.totalClimbs || 0}
+              icon="trending-up"
+            />
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.outline }]} />
+            <StatItem
+              label="Hours"
+              value={Math.round((stats?.totalDuration || 0) / 60)}
+              icon="clock-outline"
+            />
+          </View>
         </View>
 
         {/* Pending Requests Banner */}
@@ -127,68 +153,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </Card>
         )}
 
-        {/* Quick Actions */}
-        <Text variant="titleLarge" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-          Quick Actions
-        </Text>
-        <View style={styles.actionsGrid}>
-          <QuickActionCard
-            icon="plus-circle"
-            title="Log Session"
-            subtitle="Record your climb"
+        {/* Quick Actions - Horizontal Row */}
+        <View style={styles.quickActionsContainer}>
+          <QuickAction
+            icon="plus"
+            label="Log Session"
             onPress={() => navigation.navigate('NewSession')}
             color={theme.colors.primary}
           />
-          <QuickActionCard
+          <QuickAction
             icon="account-search"
-            title="Find Climbers"
-            subtitle="Meet new partners"
+            label="Find Climbers"
             onPress={() => navigation.navigate('Discover')}
-            color="#048A81"
+            color="#06B6D4"
           />
-          <QuickActionCard
+          <QuickAction
             icon="message-text"
-            title="Messages"
-            subtitle="Chat with climbers"
+            label="Messages"
             onPress={() => navigation.navigate('Messages')}
-            color="#2E4057"
+            color="#1E293B"
           />
-          <QuickActionCard
+          <QuickAction
             icon="history"
-            title="Sessions"
-            subtitle="View history"
+            label="History"
             onPress={() => navigation.navigate('Sessions')}
-            color="#FF8C5A"
+            color="#8B5CF6"
           />
         </View>
 
-        {/* Stats Overview */}
-        <Text variant="titleLarge" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
-          Your Stats
-        </Text>
-        <Card style={styles.statsContainer}>
-          <View style={styles.statsGrid}>
-            <StatCard
-              label="Sessions"
-              value={stats?.totalSessions || 0}
-              icon="calendar-check"
-            />
-            <StatCard
-              label="Climbs"
-              value={stats?.totalClimbs || 0}
-              icon="trending-up"
-            />
-            <StatCard
-              label="Hours"
-              value={Math.round((stats?.totalDuration || 0) / 60)}
-              icon="clock-outline"
-            />
-          </View>
-        </Card>
-
         {/* Recent Sessions */}
         <View style={styles.sectionHeader}>
-          <Text variant="titleLarge" style={{ color: theme.colors.onBackground }}>
+          <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
             Recent Sessions
           </Text>
           <Button
@@ -251,18 +246,46 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 32,
   },
   header: {
+    marginBottom: 20,
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   headerLeft: {
     flex: 1,
   },
+  greeting: {
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  statsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontWeight: '700',
+    marginVertical: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+  },
   requestsBanner: {
-    marginBottom: 24,
+    marginBottom: 20,
     padding: 16,
   },
   bannerContent: {
@@ -273,9 +296,26 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
-  sectionTitle: {
-    marginBottom: 16,
-    fontWeight: '600',
+  quickActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  quickAction: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  quickActionLabel: {
+    textAlign: 'center',
+    fontWeight: '500',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -283,44 +323,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
-    marginBottom: 24,
-  },
-  actionCard: {
-    width: '46%',
-    margin: '2%',
-    padding: 16,
-    alignItems: 'center',
-  },
-  actionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  actionTitle: {
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  statsContainer: {
-    marginBottom: 24,
-    padding: 16,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statCard: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontWeight: 'bold',
-    marginVertical: 4,
+  sectionTitle: {
+    fontWeight: '600',
   },
   sessionCard: {
     marginBottom: 12,

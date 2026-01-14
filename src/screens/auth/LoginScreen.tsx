@@ -78,7 +78,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         >
           <View style={styles.header}>
             <Text variant="displaySmall" style={[styles.title, { color: theme.colors.primary }]}>
-              🧗 ClimbApp
+              Belay
             </Text>
             <Text variant="titleMedium" style={{ color: theme.colors.onBackground }}>
               Welcome back, climber!

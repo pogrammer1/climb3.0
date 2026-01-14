@@ -1,5 +1,5 @@
 // App-wide constants
-export const APP_NAME = 'ClimbApp';
+export const APP_NAME = 'Belay';
 export const APP_VERSION = '1.0.0';
 
 // Climbing grades (Yosemite Decimal System)
@@ -111,8 +111,8 @@ export const PAGINATION = {
 
 // Storage paths
 export const STORAGE_PATHS = {
-  PROFILE_IMAGES: 'profile-images',
-  SESSION_IMAGES: 'session-images',
+  PROFILE_IMAGES: 'profile-photos',
+  SESSION_IMAGES: 'session-photos',
 } as const;
 
 // Match status

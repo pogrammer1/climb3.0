@@ -1,15 +1,15 @@
 // Theme configuration with light and dark mode support
 import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
 
-// Brand colors
+// Brand colors - Modern, clean palette
 const brandColors = {
-  primary: '#FF6B35',      // Climbing orange
-  secondary: '#2E4057',    // Deep blue
-  accent: '#048A81',       // Teal accent
-  success: '#4CAF50',      // Green
-  warning: '#FFC107',      // Amber
-  error: '#F44336',        // Red
-  info: '#2196F3',         // Blue
+  primary: '#6366F1',      // Indigo - modern primary
+  secondary: '#1E293B',    // Slate - clean secondary
+  accent: '#06B6D4',       // Cyan accent
+  success: '#10B981',      // Emerald
+  warning: '#F59E0B',      // Amber
+  error: '#EF4444',        // Red
+  info: '#3B82F6',         // Blue
 };
 
 // Light theme
@@ -21,23 +21,26 @@ export const lightTheme = {
     secondary: brandColors.secondary,
     tertiary: brandColors.accent,
     error: brandColors.error,
-    background: '#F5F5F5',
+    background: '#FAFAFA',
     surface: '#FFFFFF',
-    surfaceVariant: '#F0F0F0',
+    surfaceVariant: '#F1F5F9',
     onPrimary: '#FFFFFF',
     onSecondary: '#FFFFFF',
-    onBackground: '#1A1A1A',
-    onSurface: '#1A1A1A',
-    outline: '#E0E0E0',
+    onBackground: '#0F172A',
+    onSurface: '#1E293B',
+    onSurfaceVariant: '#64748B',
+    outline: '#E2E8F0',
+    primaryContainer: '#EEF2FF',
+    onPrimaryContainer: '#4338CA',
   },
   custom: {
     success: brandColors.success,
     warning: brandColors.warning,
     info: brandColors.info,
-    gradientStart: '#FF6B35',
-    gradientEnd: '#FF8C5A',
+    gradientStart: '#6366F1',
+    gradientEnd: '#8B5CF6',
     cardBackground: '#FFFFFF',
-    inputBackground: '#F5F5F5',
+    inputBackground: '#F8FAFC',
   },
 };
 
@@ -46,27 +49,30 @@ export const darkTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: brandColors.primary,
-    secondary: '#4A6583',
+    primary: '#818CF8',
+    secondary: '#64748B',
     tertiary: brandColors.accent,
     error: brandColors.error,
-    background: '#121212',
-    surface: '#1E1E1E',
-    surfaceVariant: '#2A2A2A',
+    background: '#0F172A',
+    surface: '#1E293B',
+    surfaceVariant: '#334155',
     onPrimary: '#FFFFFF',
     onSecondary: '#FFFFFF',
-    onBackground: '#FFFFFF',
-    onSurface: '#FFFFFF',
-    outline: '#404040',
+    onBackground: '#F8FAFC',
+    onSurface: '#F1F5F9',
+    onSurfaceVariant: '#94A3B8',
+    outline: '#475569',
+    primaryContainer: '#312E81',
+    onPrimaryContainer: '#C7D2FE',
   },
   custom: {
     success: brandColors.success,
     warning: brandColors.warning,
     info: brandColors.info,
-    gradientStart: '#FF6B35',
-    gradientEnd: '#FF8C5A',
-    cardBackground: '#1E1E1E',
-    inputBackground: '#2A2A2A',
+    gradientStart: '#6366F1',
+    gradientEnd: '#8B5CF6',
+    cardBackground: '#1E293B',
+    inputBackground: '#334155',
   },
 };
 

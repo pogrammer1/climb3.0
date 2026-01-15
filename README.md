@@ -1,8 +1,7 @@
-# Belay (name tbd)
-
+# Belay 
 A cross-platform (iOS, Android, Web) application for rock climbers to log sessions, connect with other climbers, and plan climbing trips together.
 
-## 🧗 Features
+## Features
 
 - **User Authentication**: Secure login/signup with Firebase Auth
 - **Climbing Session Logger**: Track your climbing sessions, grades, and progress
@@ -10,8 +9,14 @@ A cross-platform (iOS, Android, Web) application for rock climbers to log sessio
 - **Climber Matching**: Discover and connect with climbers near you
 - **Real-time Messaging**: Chat with other climbers about beta, trips, and more
 - **Location-based Discovery**: Find climbers in your area
+## Upcoming Features
 
-## 🛠 Tech Stack
+- Scheduling system
+- Notification system
+- Achievement system
+- Mobile app (just browser right now, web/mobile)
+
+## Tech Stack
 
 - **Frontend**: React Native with Expo (Web + Mobile from single codebase)
 - **Backend**: Firebase (Authentication, Firestore, Cloud Functions)
@@ -20,6 +25,6 @@ A cross-platform (iOS, Android, Web) application for rock climbers to log sessio
 - **Navigation**: React Navigation / Expo Router
 - **Hosting**: Firebase Hosting
 
-## 📄 License
+## License
 
 MIT License - see LICENSE file for details

@@ -17,6 +17,9 @@
 - created gymService.ts for Google Places API integration (optional)
 - fixed icon fonts for web deployment
 
+1/15/26
+- 
+
 
 
 troubleshooting
@@ -34,6 +37,10 @@ troubleshooting
 1/14/26
 1. pfp upload feature not working
 2. expo mobile not working
+
+1/15/26
+1. font not appearing 
+2. gym service feature issue - not seeing nearby gyms
 
 
 
@@ -152,6 +159,19 @@ EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your-storage-bucket
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
 EXPO_PUBLIC_FIREBASE_APP_ID=your-app-id
 ```
+
+// SETUP INSTRUCTIONS FOR GOOGLE PLACES API:
+// 1. Go to https://console.cloud.google.com/
+// 2. Create a new project or select your existing Firebase project
+// 3. Enable "Places API" and "Maps JavaScript API"
+// 4. Go to Credentials > Create Credentials > API Key
+// 5. Restrict the API key to your domains (belay-91a94.web.app, localhost)
+// 6. Add to your .env file: EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your-api-key
+//
+// PRICING (as of 2024):
+// - Places Autocomplete: $2.83 per 1000 requests
+// - Place Details: $17 per 1000 requests  
+// - Google gives $200/month free credit = ~7000 autocomplete searches free 
 
 ## 🤝 Contributing
 

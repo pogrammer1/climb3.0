@@ -19,53 +19,6 @@ import { lightTheme } from './src/constants/theme';
 // Keep splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// For web: inject icon font CSS from a reliable CDN
-if (Platform.OS === 'web' && typeof document !== 'undefined') {
-  const head = document.head;
-  
-  // Material Design Icons (MaterialCommunityIcons)
-  const mdiLink = document.createElement('link');
-  mdiLink.rel = 'stylesheet';
-  mdiLink.href = 'https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css';
-  head.appendChild(mdiLink);
-  
-  // Material Icons
-  const miLink = document.createElement('link');
-  miLink.rel = 'stylesheet';
-  miLink.href = 'https://fonts.googleapis.com/icon?family=Material+Icons';
-  head.appendChild(miLink);
-  
-  // Also inject the font-face for the vector-icons library
-  const fontStyle = document.createElement('style');
-  fontStyle.textContent = `
-    @font-face {
-      font-family: 'MaterialCommunityIcons';
-      font-style: normal;
-      font-weight: 400;
-      src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf') format('truetype');
-    }
-    @font-face {
-      font-family: 'MaterialIcons';
-      font-style: normal;
-      font-weight: 400;
-      src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
-    }
-    @font-face {
-      font-family: 'Ionicons';
-      font-style: normal;
-      font-weight: 400;
-      src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
-    }
-    @font-face {
-      font-family: 'FontAwesome';
-      font-style: normal;
-      font-weight: 400;
-      src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf') format('truetype');
-    }
-  `;
-  head.appendChild(fontStyle);
-}
-
 // Error Boundary to catch rendering errors
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -130,14 +83,19 @@ export default function App() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Pre-load fonts for icons to work on web
-        await Font.loadAsync({
-          ...MaterialCommunityIcons.font,
-          ...MaterialIcons.font,
-          ...Ionicons.font,
-          ...FontAwesome.font,
-        });
-        console.log('Fonts loaded successfully');
+        // On web, fonts are loaded via CSS in index.html (injected by build script)
+        // Only load fonts programmatically on native platforms
+        if (Platform.OS !== 'web') {
+          await Font.loadAsync({
+            ...MaterialCommunityIcons.font,
+            ...MaterialIcons.font,
+            ...Ionicons.font,
+            ...FontAwesome.font,
+          });
+          console.log('Fonts loaded successfully');
+        } else {
+          console.log('Web platform - fonts loaded via CSS');
+        }
       } catch (e) {
         console.warn('Error loading fonts:', e);
       } finally {

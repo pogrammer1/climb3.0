@@ -7,6 +7,7 @@ import {
   deleteSession,
   getSession,
   addClimb,
+  updateClimb,
   getSessionClimbs,
   deleteClimb,
   getSessionStats,
@@ -42,6 +43,7 @@ interface SessionState {
   updateExistingSession: (sessionId: string, data: Partial<SessionFormData>) => Promise<boolean>;
   deleteExistingSession: (sessionId: string) => Promise<boolean>;
   addClimbToSession: (sessionId: string, data: ClimbFormData) => Promise<Climb | null>;
+  updateClimbInSession: (climbId: string, data: Partial<ClimbFormData>) => Promise<boolean>;
   deleteClimbFromSession: (climbId: string) => Promise<boolean>;
   fetchStats: (userId: string) => Promise<void>;
   setFilters: (filters: SessionFilters) => void;
@@ -219,6 +221,38 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     } catch (error) {
       console.error('Add climb error:', error);
       return null;
+    }
+  },
+  
+  updateClimbInSession: async (climbId, data) => {
+    try {
+      const result = await updateClimb(climbId, data);
+      
+      if (result.success) {
+        // Update the climb in local state
+        set((state) => ({
+          currentSessionClimbs: state.currentSessionClimbs.map((c) =>
+            c.id === climbId
+              ? {
+                  ...c,
+                  name: data.name ?? c.name,
+                  climbingType: data.climbingType ?? c.climbingType,
+                  grade: (data.grade ?? c.grade) as typeof c.grade,
+                  gradeSystem: data.gradeSystem ?? c.gradeSystem,
+                  result: data.result ?? c.result,
+                  attempts: data.attempts ? parseInt(data.attempts, 10) : c.attempts,
+                  notes: data.notes ?? c.notes,
+                  rating: data.rating ?? c.rating,
+                }
+              : c
+          ),
+        }));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Update climb error:', error);
+      return false;
     }
   },
   

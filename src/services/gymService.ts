@@ -1,18 +1,4 @@
 // Gym Service - Handles gym location data with optional Google Places integration
-// 
-// SETUP INSTRUCTIONS FOR GOOGLE PLACES API:
-// 1. Go to https://console.cloud.google.com/
-// 2. Create a new project or select your existing Firebase project
-// 3. Enable "Places API" and "Maps JavaScript API"
-// 4. Go to Credentials > Create Credentials > API Key
-// 5. Restrict the API key to your domains (belay-91a94.web.app, localhost)
-// 6. Add to your .env file: EXPO_PUBLIC_GOOGLE_PLACES_API_KEY=your-api-key
-//
-// PRICING (as of 2024):
-// - Places Autocomplete: $2.83 per 1000 requests
-// - Place Details: $17 per 1000 requests  
-// - Google gives $200/month free credit = ~7000 autocomplete searches free
-//
 
 import {
   collection,
@@ -143,6 +129,7 @@ export const searchLocalGyms = async (
 
 /**
  * Search Google Places API for climbing gyms
+ * Uses the JavaScript API for web (due to CORS) and REST API for native
  */
 export const searchGooglePlaces = async (
   searchQuery: string,
@@ -156,35 +143,14 @@ export const searchGooglePlaces = async (
       ? `${searchQuery} climbing gym` 
       : `${searchQuery} rock climbing outdoor`;
     
-    // Use Places Autocomplete API
-    const autocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchTerm)}&types=establishment&location=${userLocation.latitude},${userLocation.longitude}&radius=50000&key=${apiKey}`;
-    
-    const response = await fetch(autocompleteUrl);
-    const data = await response.json();
-    
-    if (data.status !== 'OK' || !data.predictions) {
-      console.warn('Google Places API error:', data.status);
-      return [];
+    // Check if we're in a browser environment
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      // Use Google Maps JavaScript API for web (handles CORS)
+      return await searchWithJavaScriptAPI(searchTerm, locationType, userLocation, apiKey);
+    } else {
+      // Use REST API for native (no CORS issues)
+      return await searchWithRestAPI(searchTerm, locationType, userLocation, apiKey);
     }
-    
-    // Convert predictions to our Gym format
-    const gyms: Gym[] = data.predictions.slice(0, 5).map((prediction: any) => ({
-      id: `google_${prediction.place_id}`,
-      placeId: prediction.place_id,
-      name: prediction.structured_formatting?.main_text || prediction.description,
-      address: prediction.structured_formatting?.secondary_text || '',
-      city: extractCity(prediction.description),
-      state: '',
-      country: '',
-      type: locationType,
-      category: locationType === 'indoor' ? 'gym' : 'crag',
-      verified: false,
-      sessionCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
-    
-    return gyms;
   } catch (error) {
     console.error('Error searching Google Places:', error);
     return [];
@@ -192,40 +158,340 @@ export const searchGooglePlaces = async (
 };
 
 /**
+ * Load Google Maps JavaScript API dynamically (using async loading for best performance)
+ */
+let googleMapsLoaded = false;
+let googleMapsLoadPromise: Promise<void> | null = null;
+
+const loadGoogleMapsAPI = (apiKey: string): Promise<void> => {
+  if (googleMapsLoaded && (window as any).google?.maps?.places) {
+    return Promise.resolve();
+  }
+  
+  if (googleMapsLoadPromise) {
+    return googleMapsLoadPromise;
+  }
+  
+  googleMapsLoadPromise = new Promise((resolve, reject) => {
+    // Check if already loaded
+    if ((window as any).google?.maps?.places) {
+      googleMapsLoaded = true;
+      resolve();
+      return;
+    }
+    
+    // Use the recommended async loading pattern with importLibrary
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=places`;
+    script.async = true;
+    
+    script.onload = () => {
+      googleMapsLoaded = true;
+      resolve();
+    };
+    
+    script.onerror = () => {
+      googleMapsLoadPromise = null;
+      reject(new Error('Failed to load Google Maps API'));
+    };
+    
+    document.head.appendChild(script);
+  });
+  
+  return googleMapsLoadPromise;
+};
+
+/**
+ * Search using Google Maps JavaScript API (for web)
+ * Uses the new Places API (New) with AutocompleteSuggestion
+ */
+const searchWithJavaScriptAPI = async (
+  searchTerm: string,
+  locationType: 'indoor' | 'outdoor',
+  userLocation: { latitude: number; longitude: number },
+  apiKey: string
+): Promise<Gym[]> => {
+  try {
+    await loadGoogleMapsAPI(apiKey);
+    
+    const google = (window as any).google;
+    if (!google?.maps?.places) {
+      console.warn('Google Maps Places library not available');
+      return [];
+    }
+    
+    // Use the new Places API (New) with AutocompleteSuggestion
+    const { AutocompleteSuggestion } = google.maps.places;
+    
+    if (AutocompleteSuggestion) {
+      // New API available - use it
+      try {
+        const request = {
+          input: searchTerm,
+          locationBias: {
+            center: { lat: userLocation.latitude, lng: userLocation.longitude },
+            radius: 50000,
+          },
+          includedPrimaryTypes: ['establishment'],
+        };
+        
+        const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+        
+        if (!suggestions || suggestions.length === 0) {
+          return [];
+        }
+        
+        const gyms: Gym[] = suggestions.slice(0, 5).map((suggestion: any) => {
+          const prediction = suggestion.placePrediction;
+          return {
+            id: `google_${prediction.placeId}`,
+            placeId: prediction.placeId,
+            name: prediction.mainText?.text || prediction.text?.text || '',
+            address: prediction.secondaryText?.text || '',
+            city: extractCity(prediction.text?.text || ''),
+            state: '',
+            country: '',
+            type: locationType,
+            category: locationType === 'indoor' ? 'gym' : 'crag',
+            verified: false,
+            sessionCount: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+        });
+        
+        return gyms;
+      } catch (newApiError) {
+        console.warn('New Places API error, falling back to legacy:', newApiError);
+        // Fall through to legacy API
+      }
+    }
+    
+    // Fallback to legacy AutocompleteService if new API not available
+    return new Promise((resolve) => {
+      const service = new google.maps.places.AutocompleteService();
+      
+      const request = {
+        input: searchTerm,
+        locationBias: {
+          center: { lat: userLocation.latitude, lng: userLocation.longitude },
+          radius: 50000,
+        },
+        types: ['establishment'],
+      };
+      
+      service.getPlacePredictions(request, (predictions: any[], status: string) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+          console.warn('Places autocomplete error:', status);
+          resolve([]);
+          return;
+        }
+        
+        const gyms: Gym[] = predictions.slice(0, 5).map((prediction: any) => ({
+          id: `google_${prediction.place_id}`,
+          placeId: prediction.place_id,
+          name: prediction.structured_formatting?.main_text || prediction.description,
+          address: prediction.structured_formatting?.secondary_text || '',
+          city: extractCity(prediction.description),
+          state: '',
+          country: '',
+          type: locationType,
+          category: locationType === 'indoor' ? 'gym' : 'crag',
+          verified: false,
+          sessionCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
+        
+        resolve(gyms);
+      });
+    });
+  } catch (error) {
+    console.error('Error with JavaScript API:', error);
+    return [];
+  }
+};
+
+/**
+ * Search using REST API (for native apps - no CORS)
+ */
+const searchWithRestAPI = async (
+  searchTerm: string,
+  locationType: 'indoor' | 'outdoor',
+  userLocation: { latitude: number; longitude: number },
+  apiKey: string
+): Promise<Gym[]> => {
+  const autocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchTerm)}&types=establishment&location=${userLocation.latitude},${userLocation.longitude}&radius=50000&key=${apiKey}`;
+  
+  const response = await fetch(autocompleteUrl);
+  const data = await response.json();
+  
+  if (data.status !== 'OK' || !data.predictions) {
+    console.warn('Google Places API error:', data.status);
+    return [];
+  }
+  
+  const gyms: Gym[] = data.predictions.slice(0, 5).map((prediction: any) => ({
+    id: `google_${prediction.place_id}`,
+    placeId: prediction.place_id,
+    name: prediction.structured_formatting?.main_text || prediction.description,
+    address: prediction.structured_formatting?.secondary_text || '',
+    city: extractCity(prediction.description),
+    state: '',
+    country: '',
+    type: locationType,
+    category: locationType === 'indoor' ? 'gym' : 'crag',
+    verified: false,
+    sessionCount: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }));
+  
+  return gyms;
+};
+
+/**
  * Get place details from Google Places API
+ * Uses JavaScript API for web (CORS), REST API for native
  */
 export const getPlaceDetails = async (
   placeId: string,
   apiKey: string
 ): Promise<Partial<Gym> | null> => {
   try {
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,address_components&key=${apiKey}`;
-    
-    const response = await fetch(detailsUrl);
-    const data = await response.json();
-    
-    if (data.status !== 'OK' || !data.result) {
-      return null;
+    // Check if we're in a browser environment
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      return await getPlaceDetailsWithJavaScriptAPI(placeId, apiKey);
+    } else {
+      return await getPlaceDetailsWithRestAPI(placeId, apiKey);
     }
-    
-    const result = data.result;
-    const addressComponents = result.address_components || [];
-    
-    return {
-      name: result.name,
-      address: result.formatted_address,
-      city: extractAddressComponent(addressComponents, 'locality'),
-      state: extractAddressComponent(addressComponents, 'administrative_area_level_1'),
-      country: extractAddressComponent(addressComponents, 'country'),
-      location: result.geometry?.location ? {
-        latitude: result.geometry.location.lat,
-        longitude: result.geometry.location.lng,
-      } : undefined,
-    };
   } catch (error) {
     console.error('Error getting place details:', error);
     return null;
   }
+};
+
+/**
+ * Get place details using JavaScript API (for web)
+ * Uses the new Places API (New) with Place class
+ */
+const getPlaceDetailsWithJavaScriptAPI = async (
+  placeId: string,
+  apiKey: string
+): Promise<Partial<Gym> | null> => {
+  try {
+    await loadGoogleMapsAPI(apiKey);
+    
+    const google = (window as any).google;
+    if (!google?.maps?.places) {
+      return null;
+    }
+    
+    // Try to use the new Place class first
+    const { Place } = google.maps.places;
+    
+    if (Place) {
+      try {
+        const place = new Place({ id: placeId });
+        await place.fetchFields({
+          fields: ['displayName', 'formattedAddress', 'location', 'addressComponents'],
+        });
+        
+        const addressComponents = place.addressComponents || [];
+        
+        return {
+          name: place.displayName || '',
+          address: place.formattedAddress || '',
+          city: extractAddressComponentNew(addressComponents, 'locality'),
+          state: extractAddressComponentNew(addressComponents, 'administrative_area_level_1'),
+          country: extractAddressComponentNew(addressComponents, 'country'),
+          location: place.location ? {
+            latitude: place.location.lat(),
+            longitude: place.location.lng(),
+          } : undefined,
+        };
+      } catch (newApiError) {
+        console.warn('New Place API error, falling back to legacy:', newApiError);
+        // Fall through to legacy API
+      }
+    }
+    
+    // Fallback to legacy PlacesService
+    return new Promise((resolve) => {
+      const div = document.createElement('div');
+      const service = new google.maps.places.PlacesService(div);
+      
+      service.getDetails(
+        {
+          placeId: placeId,
+          fields: ['name', 'formatted_address', 'geometry', 'address_components'],
+        },
+        (result: any, status: string) => {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !result) {
+            resolve(null);
+            return;
+          }
+          
+          const addressComponents = result.address_components || [];
+          
+          resolve({
+            name: result.name,
+            address: result.formatted_address,
+            city: extractAddressComponent(addressComponents, 'locality'),
+            state: extractAddressComponent(addressComponents, 'administrative_area_level_1'),
+            country: extractAddressComponent(addressComponents, 'country'),
+            location: result.geometry?.location ? {
+              latitude: result.geometry.location.lat(),
+              longitude: result.geometry.location.lng(),
+            } : undefined,
+          });
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Error with JavaScript API place details:', error);
+    return null;
+  }
+};
+
+/**
+ * Extract address component from new Places API format
+ */
+const extractAddressComponentNew = (components: any[], type: string): string => {
+  const component = components.find((c: any) => c.types?.includes(type));
+  return component?.longText || component?.shortText || '';
+};
+
+/**
+ * Get place details using REST API (for native)
+ */
+const getPlaceDetailsWithRestAPI = async (
+  placeId: string,
+  apiKey: string
+): Promise<Partial<Gym> | null> => {
+  const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,address_components&key=${apiKey}`;
+  
+  const response = await fetch(detailsUrl);
+  const data = await response.json();
+  
+  if (data.status !== 'OK' || !data.result) {
+    return null;
+  }
+  
+  const result = data.result;
+  const addressComponents = result.address_components || [];
+  
+  return {
+    name: result.name,
+    address: result.formatted_address,
+    city: extractAddressComponent(addressComponents, 'locality'),
+    state: extractAddressComponent(addressComponents, 'administrative_area_level_1'),
+    country: extractAddressComponent(addressComponents, 'country'),
+    location: result.geometry?.location ? {
+      latitude: result.geometry.location.lat,
+      longitude: result.geometry.location.lng,
+    } : undefined,
+  };
 };
 
 /**
@@ -246,24 +512,32 @@ export const saveGymToDatabase = async (
     }
     
     const gymRef = doc(collection(db, GYMS_COLLECTION));
-    const newGym: Gym = {
+    
+    // Build the gym object, excluding undefined values
+    const newGym: Record<string, any> = {
       id: gymRef.id,
       name: gym.name || '',
       address: gym.address || '',
       city: gym.city || '',
       state: gym.state || '',
       country: gym.country || '',
-      placeId: gym.placeId,
-      location: gym.location,
       type: gym.type || 'indoor',
       category: gym.category || 'gym',
-      chain: gym.chain,
       verified: false,
       addedBy: userId,
       sessionCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
     };
+    
+    // Only add optional fields if they have values
+    if (gym.placeId) {
+      newGym.placeId = gym.placeId;
+    }
+    if (gym.location) {
+      newGym.location = gym.location;
+    }
+    if (gym.chain) {
+      newGym.chain = gym.chain;
+    }
     
     await setDoc(gymRef, {
       ...newGym,
@@ -272,7 +546,11 @@ export const saveGymToDatabase = async (
     });
     
     console.log('Gym saved to database:', newGym.name);
-    return newGym;
+    return {
+      ...newGym,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Gym;
   } catch (error) {
     console.error('Error saving gym:', error);
     return null;

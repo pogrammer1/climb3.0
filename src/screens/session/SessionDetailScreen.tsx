@@ -1,7 +1,7 @@
 // Session Detail Screen - View and manage climbing session
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
-import { Text, useTheme, IconButton, FAB, Portal, Modal, Divider, Menu, Chip } from 'react-native-paper';
+import { StyleSheet, View, ScrollView, TextInput as RNTextInput } from 'react-native';
+import { Text, useTheme, IconButton, FAB, Portal, Modal, Divider, Menu, Chip, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button, LoadingSpinner, EmptyState, GradePicker } from '../../components/common';
@@ -24,10 +24,13 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
   const { sessionId } = route.params;
   const theme = useTheme();
   const { user } = useAuthStore();
-  const { currentSession, currentSessionClimbs, isLoading, error, fetchSession, fetchSessionClimbs, addClimbToSession, deleteExistingSession, fetchStats } = useSessionStore();
+  const { currentSession, currentSessionClimbs, isLoading, error, fetchSession, fetchSessionClimbs, addClimbToSession, updateClimbInSession, deleteClimbFromSession, deleteExistingSession, fetchStats } = useSessionStore();
   
   const [menuVisible, setMenuVisible] = useState(false);
   const [addClimbModalVisible, setAddClimbModalVisible] = useState(false);
+  const [editClimbModalVisible, setEditClimbModalVisible] = useState(false);
+  const [selectedClimb, setSelectedClimb] = useState<Climb | null>(null);
+  const [climbMenuVisible, setClimbMenuVisible] = useState<string | null>(null);
   const [gradeSystem, setGradeSystem] = useState<'yds' | 'v-scale'>('v-scale');
   const [newClimb, setNewClimb] = useState<Partial<ClimbFormData>>({
     climbingType: 'Bouldering',
@@ -38,6 +41,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
     notes: '',
     rating: 3,
   });
+  const [editClimb, setEditClimb] = useState<Partial<ClimbFormData>>({});
 
   useEffect(() => {
     fetchSession(sessionId);
@@ -110,6 +114,73 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
       });
     } catch (error) {
       showAlert('Error', 'Failed to add climb');
+    }
+  };
+
+  const handleEditClimb = (climb: Climb) => {
+    setSelectedClimb(climb);
+    const gradeSystemForClimb = climb.climbingType === 'Bouldering' ? 'v-scale' : 'yds';
+    setGradeSystem(gradeSystemForClimb);
+    setEditClimb({
+      name: climb.name || '',
+      climbingType: climb.climbingType,
+      grade: climb.grade as string,
+      gradeSystem: gradeSystemForClimb,
+      attempts: String(climb.attempts),
+      result: climb.result,
+      notes: climb.notes || '',
+      rating: climb.rating || 3,
+    });
+    setClimbMenuVisible(null);
+    setEditClimbModalVisible(true);
+  };
+
+  const handleUpdateClimb = async () => {
+    if (!selectedClimb || !editClimb.grade) {
+      showAlert('Error', 'Please select a grade');
+      return;
+    }
+
+    try {
+      const success = await updateClimbInSession(selectedClimb.id, editClimb);
+      if (success) {
+        // Refresh stats
+        if (user) {
+          await fetchStats(user.uid);
+        }
+        setEditClimbModalVisible(false);
+        setSelectedClimb(null);
+        setEditClimb({});
+      } else {
+        showAlert('Error', 'Failed to update climb');
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to update climb');
+    }
+  };
+
+  const handleDeleteClimb = async (climbId: string) => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      showAlert(
+        'Delete Climb',
+        'Are you sure you want to delete this climb?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+        ]
+      );
+    });
+
+    if (confirmed) {
+      try {
+        const success = await deleteClimbFromSession(climbId);
+        if (success && user) {
+          await fetchStats(user.uid);
+        }
+        setClimbMenuVisible(null);
+      } catch (error) {
+        showAlert('Error', 'Failed to delete climb');
+      }
     }
   };
 
@@ -310,24 +381,54 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
                         <Chip compact style={styles.typeChip}>
                           {climb.climbingType}
                         </Chip>
-                        {isSuccess ? (
-                          <MaterialCommunityIcons
-                            name="check-circle"
-                            size={20}
-                            color={theme.colors.primary}
-                          />
-                        ) : (
-                          <MaterialCommunityIcons
-                            name="close-circle-outline"
-                            size={20}
-                            color={theme.colors.outline}
-                          />
-                        )}
+                        <View style={styles.climbActions}>
+                          {isSuccess ? (
+                            <MaterialCommunityIcons
+                              name="check-circle"
+                              size={20}
+                              color={theme.colors.primary}
+                            />
+                          ) : (
+                            <MaterialCommunityIcons
+                              name="close-circle-outline"
+                              size={20}
+                              color={theme.colors.outline}
+                            />
+                          )}
+                          <Menu
+                            visible={climbMenuVisible === climb.id}
+                            onDismiss={() => setClimbMenuVisible(null)}
+                            anchor={
+                              <IconButton
+                                icon="dots-vertical"
+                                size={18}
+                                onPress={() => setClimbMenuVisible(climb.id)}
+                                style={styles.climbMenuButton}
+                              />
+                            }
+                          >
+                            <Menu.Item
+                              onPress={() => handleEditClimb(climb)}
+                              title="Edit"
+                              leadingIcon="pencil"
+                            />
+                            <Menu.Item
+                              onPress={() => handleDeleteClimb(climb.id)}
+                              title="Delete"
+                              leadingIcon="delete"
+                              titleStyle={{ color: theme.colors.error }}
+                            />
+                          </Menu>
+                        </View>
                       </View>
                       <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
                         {climb.attempts} attempt{climb.attempts !== 1 ? 's' : ''} • {climb.result}
-                        {climb.notes && ` • ${climb.notes}`}
                       </Text>
+                      {climb.notes ? (
+                        <Text variant="bodySmall" style={[styles.climbNotes, { color: theme.colors.onSurfaceVariant }]}>
+                          📝 {climb.notes}
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
                 </Card>
@@ -436,6 +537,20 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
             ))}
           </View>
 
+          {/* Notes */}
+          <Text variant="labelLarge" style={[styles.label, { color: theme.colors.onSurface }]}>
+            Notes (optional)
+          </Text>
+          <TextInput
+            mode="outlined"
+            placeholder="Beta, conditions, how it felt..."
+            value={newClimb.notes || ''}
+            onChangeText={(text) => setNewClimb({ ...newClimb, notes: text })}
+            multiline
+            numberOfLines={2}
+            style={styles.notesInput}
+          />
+
           {/* Actions */}
           <View style={styles.modalActions}>
             <Button
@@ -451,6 +566,133 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
               title="Add Climb"
             />
           </View>
+        </Modal>
+      </Portal>
+
+      {/* Edit Climb Modal */}
+      <Portal>
+        <Modal
+          visible={editClimbModalVisible}
+          onDismiss={() => {
+            setEditClimbModalVisible(false);
+            setSelectedClimb(null);
+            setEditClimb({});
+          }}
+          contentContainerStyle={[styles.modal, { backgroundColor: theme.colors.surface }]}
+        >
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text variant="titleLarge" style={[styles.modalTitle, { color: theme.colors.onSurface }]}>
+              Edit Climb
+            </Text>
+
+            {/* Climb Type */}
+            <Text variant="labelLarge" style={[styles.label, { color: theme.colors.onSurface }]}>
+              Type
+            </Text>
+            <View style={styles.typeButtons}>
+              {CLIMBING_TYPES.map((type) => (
+                <Chip
+                  key={type}
+                  selected={editClimb.climbingType === type}
+                  onPress={() => {
+                    const newGradeSystem = type === 'Bouldering' ? 'v-scale' : 'yds';
+                    setGradeSystem(newGradeSystem);
+                    setEditClimb({ ...editClimb, climbingType: type as ClimbingType, gradeSystem: newGradeSystem });
+                  }}
+                  style={styles.typeButton}
+                >
+                  {type}
+                </Chip>
+              ))}
+            </View>
+
+            {/* Grade Picker */}
+            <Text variant="labelLarge" style={[styles.label, { color: theme.colors.onSurface }]}>
+              Grade
+            </Text>
+            <GradePicker
+              gradeSystem={gradeSystem}
+              value={editClimb.grade || ''}
+              onValueChange={(grade) => setEditClimb({ ...editClimb, grade })}
+            />
+
+            {/* Attempts */}
+            <Text variant="labelLarge" style={[styles.label, { color: theme.colors.onSurface }]}>
+              Attempts
+            </Text>
+            <View style={styles.attemptsRow}>
+              <IconButton
+                icon="minus"
+                mode="contained"
+                onPress={() => {
+                  const current = parseInt(editClimb.attempts || '1', 10);
+                  setEditClimb({ ...editClimb, attempts: String(Math.max(1, current - 1)) });
+                }}
+              />
+              <Text variant="headlineSmall" style={{ color: theme.colors.onSurface }}>
+                {editClimb.attempts || '1'}
+              </Text>
+              <IconButton
+                icon="plus"
+                mode="contained"
+                onPress={() => {
+                  const current = parseInt(editClimb.attempts || '1', 10);
+                  setEditClimb({ ...editClimb, attempts: String(current + 1) });
+                }}
+              />
+            </View>
+
+            {/* Result */}
+            <Text variant="labelLarge" style={[styles.label, { color: theme.colors.onSurface }]}>
+              Result
+            </Text>
+            <View style={styles.typeButtons}>
+              {ATTEMPT_RESULTS.map((result) => (
+                <Chip
+                  key={result}
+                  selected={editClimb.result === result}
+                  onPress={() => setEditClimb({ ...editClimb, result: result as AttemptResult })}
+                  style={styles.typeButton}
+                >
+                  {result}
+                </Chip>
+              ))}
+            </View>
+
+            {/* Notes */}
+            <Text variant="labelLarge" style={[styles.label, { color: theme.colors.onSurface }]}>
+              Notes (optional)
+            </Text>
+            <TextInput
+              mode="outlined"
+              placeholder="Beta, conditions, how it felt..."
+              value={editClimb.notes || ''}
+              onChangeText={(text) => setEditClimb({ ...editClimb, notes: text })}
+              multiline
+              numberOfLines={2}
+              style={styles.notesInput}
+            />
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <Button
+                variant="outline"
+                onPress={() => {
+                  setEditClimbModalVisible(false);
+                  setSelectedClimb(null);
+                  setEditClimb({});
+                }}
+                style={styles.modalButton}
+                title="Cancel"
+              />
+              <Button
+                variant="primary"
+                onPress={handleUpdateClimb}
+                style={styles.modalButton}
+                title="Save Changes"
+              />
+            </View>
+          </ScrollView>
         </Modal>
       </Portal>
     </SafeAreaView>
@@ -544,6 +786,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  climbActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  climbMenuButton: {
+    margin: 0,
+    marginLeft: 4,
+  },
+  climbNotes: {
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
   typeChip: {
     height: 24,
   },
@@ -556,6 +810,7 @@ const styles = StyleSheet.create({
     margin: 20,
     borderRadius: 16,
     padding: 24,
+    maxHeight: '85%',
   },
   modalTitle: {
     marginBottom: 20,
@@ -578,6 +833,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
+  },
+  notesInput: {
+    marginTop: 4,
   },
   completedRow: {
     flexDirection: 'row',

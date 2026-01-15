@@ -3,8 +3,7 @@
     "public": "dist",
     "ignore": [
       "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
+      "**/.*"
     ],
     "rewrites": [
       {
@@ -13,6 +12,23 @@
       }
     ],
     "headers": [
+      {
+        "source": "assets/**/*.ttf",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "font/ttf"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000"
+          },
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+          }
+        ]
+      },
       {
         "source": "**/*.@(js|jsx|ts|tsx)",
         "headers": [
@@ -37,10 +53,16 @@
           {
             "key": "Cache-Control",
             "value": "max-age=31536000"
+          },
+          {
+            "key": "Access-Control-Allow-Origin", 
+            "value": "*"
           }
         ]
       }
-    ]
+    ],
+    "cleanUrls": true,
+    "trailingSlash": false
   },
   "firestore": {
     "rules": "firestore.rules",

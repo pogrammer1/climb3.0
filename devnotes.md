@@ -176,6 +176,8 @@ EXPO_PUBLIC_FIREBASE_APP_ID=your-app-id
 // - Place Details: $17 per 1000 requests  
 // - Google gives $200/month free credit = ~7000 autocomplete searches free 
 
+Update firestore.rules when implementing new features after linking all the files together. 
+
 ## 🤝 Contributing
 
 1. Fork the repository

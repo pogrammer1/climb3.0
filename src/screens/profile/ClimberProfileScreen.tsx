@@ -7,9 +7,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Avatar, Button, LoadingSpinner, EmptyState } from '../../components/common';
 import { useAuthStore, useMatchStore } from '../../store';
 import { getProfile } from '../../services/profileService';
+import { getSchedule, formatTimeSlot, findScheduleOverlaps } from '../../services/scheduleService';
 import { getOrCreateConversation } from '../../services/messageService';
-import { ClimberProfile } from '../../types';
+import { ClimberProfile, WeeklySchedule, ScheduleOverlap } from '../../types';
 import { showAlert } from '../../utils/alert';
+import { useScheduleStore } from '../../store/scheduleStore';
 
 interface ClimberProfileScreenProps {
   navigation: any;
@@ -28,9 +30,13 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
   const { profile: myProfile } = useAuthStore();
 
   const [climber, setClimber] = useState<ClimberProfile | null>(null);
+  const [climberSchedule, setClimberSchedule] = useState<WeeklySchedule | null>(null);
+  const [scheduleOverlaps, setScheduleOverlaps] = useState<ScheduleOverlap[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sendingRequest, setSendingRequest] = useState(false);
   const [openingChat, setOpeningChat] = useState(false);
+
+  const { mySchedule, fetchMySchedule } = useScheduleStore();
 
   // Check if already connected with this climber
   const isConnected = acceptedMatches.some(
@@ -41,15 +47,32 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
     loadProfile();
     if (user) {
       fetchAcceptedMatches(user.uid);
+      fetchMySchedule(user.uid);
     }
   }, [climberId, user]);
+
+  // Calculate schedule overlaps when both schedules are available
+  useEffect(() => {
+    if (mySchedule && climberSchedule) {
+      const overlaps = findScheduleOverlaps(mySchedule, climberSchedule);
+      setScheduleOverlaps(overlaps);
+    }
+  }, [mySchedule, climberSchedule]);
 
   const loadProfile = async () => {
     setIsLoading(true);
     try {
-      const result = await getProfile(climberId);
-      if (result.success && result.data) {
-        setClimber(result.data as ClimberProfile);
+      const [profileResult, scheduleResult] = await Promise.all([
+        getProfile(climberId),
+        getSchedule(climberId),
+      ]);
+      
+      if (profileResult.success && profileResult.data) {
+        setClimber(profileResult.data as ClimberProfile);
+      }
+      
+      if (scheduleResult.success && scheduleResult.data) {
+        setClimberSchedule(scheduleResult.data);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -244,17 +267,59 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
         )}
 
         {/* Availability */}
-        {climber.availableDays && climber.availableDays.length > 0 && (
+        {climberSchedule && climberSchedule.schedule.some(d => d.isAvailable) && (
           <Card style={styles.availabilityCard}>
             <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
-              Availability
+              Climbing Schedule
             </Text>
-            <View style={styles.chipsContainer}>
-              {climber.availableDays.map((day: string) => (
-                <Chip key={day} style={styles.chip} icon="calendar">
-                  {day}
-                </Chip>
-              ))}
+            
+            {/* Schedule Overlaps - Show when connected or viewing */}
+            {scheduleOverlaps.length > 0 && (
+              <View style={[styles.overlapSection, { backgroundColor: theme.colors.primaryContainer }]}>
+                <View style={styles.overlapHeader}>
+                  <MaterialCommunityIcons name="clock-check" size={20} color={theme.colors.primary} />
+                  <Text variant="labelLarge" style={{ color: theme.colors.primary, marginLeft: 8, fontWeight: '600' }}>
+                    Matching Availability
+                  </Text>
+                </View>
+                {scheduleOverlaps.map((overlap) => (
+                  <View key={overlap.day} style={styles.overlapDay}>
+                    <Text variant="bodyMedium" style={{ color: theme.colors.onPrimaryContainer, fontWeight: '600' }}>
+                      {overlap.day}
+                    </Text>
+                    <View style={styles.overlapSlots}>
+                      {overlap.overlappingSlots.map((slot, idx) => (
+                        <Text key={idx} variant="bodySmall" style={{ color: theme.colors.onPrimaryContainer }}>
+                          {formatTimeSlot(slot)}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+            
+            {/* Full Schedule Display */}
+            <View style={styles.scheduleGrid}>
+              {climberSchedule.schedule
+                .filter(day => day.isAvailable && day.slots.length > 0)
+                .map((day) => (
+                  <View key={day.day} style={[styles.scheduleDay, { backgroundColor: theme.colors.surfaceVariant }]}>
+                    <Text variant="labelLarge" style={{ color: theme.colors.onSurface, fontWeight: '600' }}>
+                      {day.day}
+                    </Text>
+                    <View style={styles.daySlots}>
+                      {day.slots.map((slot, idx) => (
+                        <View key={idx} style={styles.slotRow}>
+                          <MaterialCommunityIcons name="clock-outline" size={14} color={theme.colors.onSurfaceVariant} />
+                          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }}>
+                            {formatTimeSlot(slot)}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ))}
             </View>
           </Card>
         )}
@@ -357,6 +422,42 @@ const styles = StyleSheet.create({
   availabilityCard: {
     padding: 16,
     marginBottom: 16,
+  },
+  overlapSection: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  overlapHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  overlapDay: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  overlapSlots: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  scheduleGrid: {
+    gap: 8,
+  },
+  scheduleDay: {
+    padding: 12,
+    borderRadius: 8,
+  },
+  daySlots: {
+    marginTop: 6,
+    gap: 4,
+  },
+  slotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   chipsContainer: {
     flexDirection: 'row',

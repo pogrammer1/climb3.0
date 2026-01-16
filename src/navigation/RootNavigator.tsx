@@ -6,6 +6,7 @@ import { MainTabNavigator } from './MainTabNavigator';
 import { NewSessionScreen, SessionDetailScreen, EditSessionScreen } from '../screens/session';
 import { ChatScreen } from '../screens/chat';
 import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen } from '../screens/profile';
+import { ConnectionScheduleScreen, MyScheduleScreen } from '../screens/schedule';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -36,6 +37,12 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Chat" component={ChatScreen as React.ComponentType<{}>} />
       <Stack.Screen name="ClimberProfile" component={ClimberProfileScreen as React.ComponentType<{}>} />
       <Stack.Screen name="MatchRequests" component={MatchRequestsScreen} />
+      <Stack.Screen name="ConnectionSchedule" component={ConnectionScheduleScreen} />
+      <Stack.Screen
+        name="MySchedule"
+        component={MyScheduleScreen}
+        options={{ presentation: 'modal' }}
+      />
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}

@@ -8,3 +8,4 @@ export { EmptyState } from './EmptyState';
 export { ChipSelector } from './ChipSelector';
 export { GradePicker } from './GradePicker';
 export { GymPicker } from './GymPicker';
+export { SchedulePicker } from './SchedulePicker';

@@ -5,3 +5,4 @@ export * from './sessionService';
 export * from './matchService';
 export * from './messageService';
 export * from './gymService';
+export * from './scheduleService';

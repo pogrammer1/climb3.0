@@ -225,3 +225,39 @@ export interface ClimbFormData {
   notes: string;
   rating: number;
 }
+
+// Schedule/Availability types
+export interface TimeSlot {
+  startTime: string; // Format: "HH:MM" (24-hour)
+  endTime: string;   // Format: "HH:MM" (24-hour)
+}
+
+export interface DayAvailability {
+  day: DayOfWeek;
+  slots: TimeSlot[];
+  isAvailable: boolean;
+}
+
+export interface WeeklySchedule {
+  id: string;
+  userId: string;
+  schedule: DayAvailability[];
+  preferredGyms: string[];
+  notes: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ScheduleOverlap {
+  day: DayOfWeek;
+  overlappingSlots: TimeSlot[];
+}
+
+export interface ConnectionScheduleMatch {
+  connectionId: string;
+  connectionProfile: UserProfile;
+  overlaps: ScheduleOverlap[];
+  totalOverlapMinutes: number;
+}
+
+export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';

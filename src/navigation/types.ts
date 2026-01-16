@@ -28,6 +28,8 @@ export type RootStackParamList = {
   MatchProfile: { matchId: string };
   ClimberProfile: { climberId: string };
   MatchRequests: undefined;
+  ConnectionSchedule: undefined;
+  MySchedule: undefined;
   Settings: undefined;
 };
 

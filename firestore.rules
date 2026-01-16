@@ -146,5 +146,16 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && 
                       resource.data.addedBy == request.auth.uid;
     }
+    
+    // Schedules collection (user climbing availability)
+    match /schedules/{userId} {
+      // Anyone authenticated can read schedules (for finding overlaps with connections)
+      allow read: if isAuthenticated();
+      
+      // Only the user can write their own schedule
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
   }
 }

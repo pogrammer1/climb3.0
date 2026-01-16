@@ -90,6 +90,16 @@ export const TIME_PREFERENCES = [
   'Night (8pm+)',
 ] as const;
 
+// Predefined time slots for scheduling
+export const SCHEDULE_TIME_SLOTS = [
+  { label: 'Early Morning', startTime: '05:00', endTime: '08:00' },
+  { label: 'Morning', startTime: '08:00', endTime: '11:00' },
+  { label: 'Midday', startTime: '11:00', endTime: '14:00' },
+  { label: 'Afternoon', startTime: '14:00', endTime: '17:00' },
+  { label: 'Evening', startTime: '17:00', endTime: '20:00' },
+  { label: 'Night', startTime: '20:00', endTime: '23:00' },
+] as const;
+
 // Firestore collection names
 export const COLLECTIONS = {
   USERS: 'users',
@@ -100,6 +110,7 @@ export const COLLECTIONS = {
   MESSAGES: 'messages',
   MATCHES: 'matches',
   NOTIFICATIONS: 'notifications',
+  SCHEDULES: 'schedules',
 } as const;
 
 // Pagination limits

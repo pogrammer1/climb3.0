@@ -374,6 +374,15 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
                 </Badge>
               )}
             </View>
+            <Pressable 
+              style={[styles.scheduleButton, { backgroundColor: theme.colors.primaryContainer }]}
+              onPress={() => navigation.navigate('ConnectionSchedule')}
+            >
+              <MaterialCommunityIcons name="calendar-clock" size={18} color={theme.colors.primary} />
+              <Text variant="labelMedium" style={{ color: theme.colors.primary, marginLeft: 6, fontWeight: '600' }}>
+                Schedules
+              </Text>
+            </Pressable>
           </View>
           
           {connectedWithProfiles.length === 0 ? (
@@ -561,6 +570,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
+  },
+  scheduleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   divider: {
     marginHorizontal: 16,

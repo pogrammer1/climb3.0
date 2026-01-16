@@ -18,7 +18,10 @@
 - fixed icon fonts for web deployment
 
 1/15/26
-- 
+- check git logs lool
+
+1/16/26
+- adding scheduling feature
 
 
 

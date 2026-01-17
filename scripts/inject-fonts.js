@@ -118,11 +118,34 @@ function injectFonts() {
   
   const fontCSS = `<style id="icon-fonts">${fontFaces.join('\n')}</style>`;
   
+  // Build preload links for better mobile performance
+  const preloadLinks = [];
+  if (materialCommunityIcons) {
+    preloadLinks.push(`<link rel="preload" href="${fontBasePath}/${materialCommunityIcons}" as="font" type="font/ttf" crossorigin="anonymous">`);
+  }
+  if (materialIcons) {
+    preloadLinks.push(`<link rel="preload" href="${fontBasePath}/${materialIcons}" as="font" type="font/ttf" crossorigin="anonymous">`);
+  }
+  if (ionicons) {
+    preloadLinks.push(`<link rel="preload" href="${fontBasePath}/${ionicons}" as="font" type="font/ttf" crossorigin="anonymous">`);
+  }
+  if (fontAwesome) {
+    preloadLinks.push(`<link rel="preload" href="${fontBasePath}/${fontAwesome}" as="font" type="font/ttf" crossorigin="anonymous">`);
+  }
+  
+  const preloadHTML = preloadLinks.join('\n    ');
+  
   // Read index.html
   let html = fs.readFileSync(indexPath, 'utf8');
   
   // Remove old icon-fonts style if exists
   html = html.replace(/<style id="icon-fonts">[\s\S]*?<\/style>/g, '');
+  
+  // Remove old preload links if exists
+  html = html.replace(/<!-- Icon Font Preloads -->[\s\S]*?<!-- End Icon Font Preloads -->/g, '');
+  
+  // Inject preload links after <meta charset>
+  html = html.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n    <!-- Icon Font Preloads -->\n    ${preloadHTML}\n    <!-- End Icon Font Preloads -->`);
   
   // Inject CSS before </head>
   html = html.replace('</head>', `${fontCSS}\n</head>`);
@@ -132,6 +155,7 @@ function injectFonts() {
   console.log(`  - MaterialIcons: ${materialIcons || 'NOT FOUND'}`);
   console.log(`  - Ionicons: ${ionicons || 'NOT FOUND'}`);
   console.log(`  - FontAwesome: ${fontAwesome || 'NOT FOUND'}`);
+  console.log(`  - Preload links: ${preloadLinks.length} added for faster mobile loading`);
 }
 
 injectFonts();

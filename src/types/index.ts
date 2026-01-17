@@ -35,8 +35,19 @@ export interface UserProfile {
   certifications: string[];
   isProfileComplete: boolean;
   isSearchable: boolean;
+  // Email notification preferences
+  emailNotifications: boolean;
+  emailNotificationTypes: EmailNotificationType[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Email notification types
+export type EmailNotificationType = 'messages' | 'connections' | 'reminders';
+
+export interface EmailNotificationPreferences {
+  enabled: boolean;
+  types: EmailNotificationType[];
 }
 
 export interface Location {

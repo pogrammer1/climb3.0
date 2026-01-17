@@ -8,9 +8,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { Input, Button, GradePicker, LoadingSpinner } from '../../components/common';
 import { useAuthStore } from '../../store';
 import { saveProfile, uploadProfilePhoto } from '../../services/profileService';
-import { UserProfile, ExperienceLevel, ClimbingType, YDSGrade, BoulderingGrade } from '../../types';
+import { UserProfile, ExperienceLevel, ClimbingType, YDSGrade, BoulderingGrade, EmailNotificationType } from '../../types';
 import { EXPERIENCE_LEVELS, CLIMBING_TYPES } from '../../constants';
 import { showAlert } from '../../utils/alert';
+
+// Email notification type options
+const EMAIL_NOTIFICATION_TYPES: { value: EmailNotificationType; label: string; description: string }[] = [
+  { value: 'messages', label: 'New Messages', description: 'When someone sends you a message' },
+  { value: 'connections', label: 'Connection Requests', description: 'When someone wants to connect' },
+  { value: 'reminders', label: 'Climbing Reminders', description: 'Upcoming sessions and activity' },
+];
 
 interface EditProfileScreenProps {
   navigation: any;
@@ -34,6 +41,8 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
     partnerPreferences: [] as string[],
     availableDays: [] as string[],
     availableTimes: [] as string[],
+    emailNotifications: true,
+    emailNotificationTypes: ['messages', 'connections'] as EmailNotificationType[],
   });
 
   useEffect(() => {
@@ -50,6 +59,8 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
         partnerPreferences: profile.partnerPreferences || [],
         availableDays: profile.availableDays || [],
         availableTimes: profile.availableTimes || [],
+        emailNotifications: profile.emailNotifications ?? true,
+        emailNotificationTypes: profile.emailNotificationTypes || ['messages', 'connections'],
       });
     }
   }, [profile]);
@@ -100,6 +111,15 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
     }));
   };
 
+  const toggleEmailNotificationType = (type: EmailNotificationType) => {
+    setFormData((prev) => ({
+      ...prev,
+      emailNotificationTypes: prev.emailNotificationTypes.includes(type)
+        ? prev.emailNotificationTypes.filter((t) => t !== type)
+        : [...prev.emailNotificationTypes, type],
+    }));
+  };
+
   const handleSave = async () => {
     if (!user) {
       showAlert('Error', 'You must be logged in to save changes');
@@ -127,6 +147,8 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
         partnerPreferences: formData.partnerPreferences,
         availableDays: formData.availableDays,
         availableTimes: formData.availableTimes,
+        emailNotifications: formData.emailNotifications,
+        emailNotificationTypes: formData.emailNotificationTypes,
       }, isNewProfile);
 
       console.log('Save result:', result);
@@ -296,6 +318,91 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
           />
         </View>
 
+        {/* Email Notifications */}
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
+            Email Notifications
+          </Text>
+          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}>
+            Receive email updates for important activity
+          </Text>
+          
+          <Pressable
+            onPress={() => setFormData({ ...formData, emailNotifications: !formData.emailNotifications })}
+            style={[styles.notificationToggle, { backgroundColor: theme.colors.surface }]}
+          >
+            <View style={styles.notificationToggleContent}>
+              <MaterialCommunityIcons
+                name={formData.emailNotifications ? 'bell' : 'bell-off'}
+                size={24}
+                color={formData.emailNotifications ? theme.colors.primary : theme.colors.onSurfaceVariant}
+              />
+              <View style={styles.notificationToggleText}>
+                <Text variant="bodyLarge" style={{ color: theme.colors.onSurface }}>
+                  Enable Email Notifications
+                </Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {formData.emailNotifications ? 'You will receive emails' : 'Emails are disabled'}
+                </Text>
+              </View>
+            </View>
+            <View
+              style={[
+                styles.toggleSwitch,
+                {
+                  backgroundColor: formData.emailNotifications ? theme.colors.primary : theme.colors.surfaceVariant,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.toggleKnob,
+                  {
+                    backgroundColor: 'white',
+                    transform: [{ translateX: formData.emailNotifications ? 20 : 0 }],
+                  },
+                ]}
+              />
+            </View>
+          </Pressable>
+
+          {formData.emailNotifications && (
+            <View style={styles.notificationTypes}>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurface, marginBottom: 8 }}>
+                Notify me about:
+              </Text>
+              {EMAIL_NOTIFICATION_TYPES.map((type) => (
+                <Pressable
+                  key={type.value}
+                  onPress={() => toggleEmailNotificationType(type.value)}
+                  style={[
+                    styles.notificationTypeItem,
+                    {
+                      backgroundColor: formData.emailNotificationTypes.includes(type.value)
+                        ? theme.colors.primaryContainer
+                        : theme.colors.surface,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={formData.emailNotificationTypes.includes(type.value) ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                    size={22}
+                    color={formData.emailNotificationTypes.includes(type.value) ? theme.colors.primary : theme.colors.onSurfaceVariant}
+                  />
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
+                      {type.label}
+                    </Text>
+                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                      {type.description}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Save Button */}
         <Button
           title="Save Changes"
@@ -373,6 +480,45 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 16,
+  },
+  notificationToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  notificationToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  notificationToggleText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    padding: 5,
+    justifyContent: 'center',
+  },
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  notificationTypes: {
+    marginTop: 8,
+  },
+  notificationTypeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 8,
   },
 });
 

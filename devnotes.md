@@ -24,7 +24,7 @@
 - adding scheduling feature
 
 1/17/26
-- add notifcation system
+- add notification system (firebase cloud functions w/ ts)
 
 
 
@@ -185,6 +185,9 @@ EXPO_PUBLIC_FIREBASE_APP_ID=your-app-id
 // - Google gives $200/month free credit = ~7000 autocomplete searches free 
 
 Update firestore.rules when implementing new features after linking all the files together. 
+
+## Firebase cloud functions (for email notis)
+firebase init functions --non-interactive
 
 ## 🤝 Contributing
 

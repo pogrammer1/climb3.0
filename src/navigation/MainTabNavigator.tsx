@@ -12,7 +12,7 @@ import {
   ProfileScreen,
 } from '../screens/main';
 import { MainTabParamList } from './types';
-import { useMessageStore } from '../store';
+import { useMessageStore, useMatchStore, useNotificationStore } from '../store';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -21,7 +21,8 @@ type TabIconName = 'home' | 'home-outline' | 'clipboard-list' | 'clipboard-list-
 
 export const MainTabNavigator: React.FC = () => {
   const theme = useTheme();
-  const { unreadCount } = useMessageStore();
+  const { totalUnreadCount } = useMessageStore();
+  const { pendingRequests } = useMatchStore();
 
   const getTabBarIcon = (
     routeName: keyof MainTabParamList,
@@ -75,14 +76,17 @@ export const MainTabNavigator: React.FC = () => {
       <Tab.Screen
         name="Discover"
         component={DiscoverScreen}
-        options={{ tabBarLabel: 'Discover' }}
+        options={{ 
+          tabBarLabel: 'Discover',
+          tabBarBadge: pendingRequests.length > 0 ? pendingRequests.length : undefined,
+        }}
       />
       <Tab.Screen
         name="Messages"
         component={MessagesScreen}
         options={{
           tabBarLabel: 'Messages',
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadge: totalUnreadCount > 0 ? totalUnreadCount : undefined,
         }}
       />
       <Tab.Screen

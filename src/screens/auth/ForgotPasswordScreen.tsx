@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input } from '../../components/common';
+import { Button, Input, Logo } from '../../components/common';
 import { resetPassword } from '../../services/authService';
 
 interface ForgotPasswordScreenProps {
@@ -86,8 +86,9 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navi
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
+            <Logo size="small" variant="icon-only" />
             <Text variant="headlineMedium" style={[styles.title, { color: theme.colors.primary }]}>
-              🔐 Reset Password
+              Reset Password
             </Text>
             <Text variant="bodyLarge" style={{ color: theme.colors.onBackground, textAlign: 'center' }}>
               Enter your email address and we'll send you a link to reset your password.

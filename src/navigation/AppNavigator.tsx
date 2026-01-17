@@ -8,7 +8,7 @@ import { useAuthStore } from '../store';
 import { getProfile } from '../services/profileService';
 import { AuthNavigator } from './AuthNavigator';
 import { RootNavigator } from './RootNavigator';
-import { LoadingSpinner } from '../components/common';
+import { LoadingSpinner, NotificationProvider } from '../components/common';
 import { AppStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -50,13 +50,15 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
-          <Stack.Screen name="Main" component={RootNavigator} />
-        ) : (
-          <Stack.Screen name="Auth" component={AuthNavigator} />
-        )}
-      </Stack.Navigator>
+      <NotificationProvider>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {user ? (
+            <Stack.Screen name="Main" component={RootNavigator} />
+          ) : (
+            <Stack.Screen name="Auth" component={AuthNavigator} />
+          )}
+        </Stack.Navigator>
+      </NotificationProvider>
     </NavigationContainer>
   );
 };

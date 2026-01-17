@@ -5,7 +5,7 @@ import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { Card, Avatar, Button, LoadingSpinner } from '../../components/common';
+import { Card, Avatar, Button, LoadingSpinner, NotificationBanner } from '../../components/common';
 import { useAuthStore, useSessionStore, useMatchStore } from '../../store';
 
 interface HomeScreenProps {
@@ -131,6 +131,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             />
           </View>
         </View>
+
+        {/* Notification Permission Banner */}
+        <NotificationBanner />
 
         {/* Pending Requests Banner */}
         {pendingRequests.length > 0 && (

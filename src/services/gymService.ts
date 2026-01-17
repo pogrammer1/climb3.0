@@ -221,17 +221,20 @@ const searchWithJavaScriptAPI = async (
     }
     
     // Use the new Places API (New) with AutocompleteSuggestion
-    const { AutocompleteSuggestion } = google.maps.places;
+    const { AutocompleteSuggestion, Place } = google.maps.places;
     
     if (AutocompleteSuggestion) {
       // New API available - use it
       try {
+        // Create a proper Circle object for locationBias (new API format)
+        const locationBias = new google.maps.Circle({
+          center: { lat: userLocation.latitude, lng: userLocation.longitude },
+          radius: 50000,
+        });
+        
         const request = {
           input: searchTerm,
-          locationBias: {
-            center: { lat: userLocation.latitude, lng: userLocation.longitude },
-            radius: 50000,
-          },
+          locationBias: locationBias,
           includedPrimaryTypes: ['establishment'],
         };
         
@@ -261,7 +264,15 @@ const searchWithJavaScriptAPI = async (
         });
         
         return gyms;
-      } catch (newApiError) {
+      } catch (newApiError: any) {
+        // Check for expired key error
+        if (newApiError?.message?.includes('ExpiredKey') || 
+            newApiError?.message?.includes('InvalidKey') ||
+            newApiError?.message?.includes('API key')) {
+          console.error('Google Maps API key issue:', newApiError.message);
+          // Don't fall back, just return empty results since the key is invalid
+          return [];
+        }
         console.warn('New Places API error, falling back to legacy:', newApiError);
         // Fall through to legacy API
       }
@@ -271,12 +282,11 @@ const searchWithJavaScriptAPI = async (
     return new Promise((resolve) => {
       const service = new google.maps.places.AutocompleteService();
       
+      // Use location and radius for legacy API (proper format)
       const request = {
         input: searchTerm,
-        locationBias: {
-          center: { lat: userLocation.latitude, lng: userLocation.longitude },
-          radius: 50000,
-        },
+        location: new google.maps.LatLng(userLocation.latitude, userLocation.longitude),
+        radius: 50000,
         types: ['establishment'],
       };
       
@@ -306,8 +316,15 @@ const searchWithJavaScriptAPI = async (
         resolve(gyms);
       });
     });
-  } catch (error) {
-    console.error('Error with JavaScript API:', error);
+  } catch (error: any) {
+    // Check for API key errors
+    if (error?.message?.includes('ExpiredKey') || 
+        error?.message?.includes('InvalidKey') ||
+        error?.message?.includes('API key')) {
+      console.error('Google Maps API key issue:', error.message);
+    } else {
+      console.error('Error with JavaScript API:', error);
+    }
     return [];
   }
 };

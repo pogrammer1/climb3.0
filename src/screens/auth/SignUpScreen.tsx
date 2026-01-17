@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input } from '../../components/common';
+import { Button, Input, Logo } from '../../components/common';
 import { signUp } from '../../services/authService';
 import { saveProfile } from '../../services/profileService';
 import { SignupFormData } from '../../types';
@@ -107,10 +107,8 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text variant="displaySmall" style={[styles.title, { color: theme.colors.primary }]}>
-              🧗 ClimbApp
-            </Text>
-            <Text variant="titleMedium" style={{ color: theme.colors.onBackground }}>
+            <Logo size="medium" />
+            <Text variant="titleMedium" style={[styles.subtitle, { color: theme.colors.onBackground }]}>
               Join the climbing community!
             </Text>
           </View>
@@ -208,9 +206,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
-  title: {
-    fontWeight: 'bold',
-    marginBottom: 8,
+  subtitle: {
+    marginTop: 12,
   },
   form: {
     marginBottom: 24,

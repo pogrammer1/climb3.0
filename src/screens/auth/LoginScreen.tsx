@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input } from '../../components/common';
+import { Button, Input, Logo } from '../../components/common';
 import { signIn } from '../../services/authService';
 import { LoginFormData } from '../../types';
 
@@ -77,10 +77,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text variant="displaySmall" style={[styles.title, { color: theme.colors.primary }]}>
-              Belay
-            </Text>
-            <Text variant="titleMedium" style={{ color: theme.colors.onBackground }}>
+            <Logo size="large" />
+            <Text variant="titleMedium" style={[styles.subtitle, { color: theme.colors.onBackground }]}>
               Welcome back, climber!
             </Text>
           </View>
@@ -162,9 +160,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
   },
-  title: {
-    fontWeight: 'bold',
-    marginBottom: 8,
+  subtitle: {
+    marginTop: 12,
   },
   form: {
     marginBottom: 24,

@@ -115,9 +115,9 @@ service cloud.firestore {
                         request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
                         request.resource.data.senderId == request.auth.uid;
         
-        // Message sender can update their own message
+        // Participants can update messages (for read receipts) or sender can edit their message
         allow update: if isAuthenticated() && 
-                        resource.data.senderId == request.auth.uid;
+                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
         
         // Message sender can delete their own message
         allow delete: if isAuthenticated() && 

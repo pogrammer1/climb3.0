@@ -9,3 +9,6 @@ export { ChipSelector } from './ChipSelector';
 export { GradePicker } from './GradePicker';
 export { GymPicker } from './GymPicker';
 export { SchedulePicker } from './SchedulePicker';
+export { NotificationProvider } from './NotificationProvider';
+export { NotificationBanner } from './NotificationBanner';
+export { Logo } from './Logo';

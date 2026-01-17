@@ -104,7 +104,7 @@ export interface Conversation {
 }
 
 export interface ConversationParticipant {
-  odisplayName: string;
+  displayName: string;
   photoURL: string | null;
   unreadCount: number;
 }

@@ -23,6 +23,9 @@
 1/16/26
 - adding scheduling feature
 
+1/17/26
+- add notifcation system
+
 
 
 troubleshooting
@@ -44,6 +47,11 @@ troubleshooting
 1/15/26
 1. font not appearing 
 2. gym service feature issue - not seeing nearby gyms
+
+1/17/26
+1. gymService feature issue reoccurance, prob have to do with changing google API recently b/c of git commit leak
+2. message console log w/ firebase error(permissions)
+3. logo not showing up on mobile 
 
 
 

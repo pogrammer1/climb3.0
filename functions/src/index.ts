@@ -123,7 +123,8 @@ function wantsNotificationType(profile: UserProfile, type: string): boolean {
 async function sendEmail(
   to: string,
   subject: string,
-  htmlContent: string
+  htmlContent: string,
+  replyTo?: string
 ): Promise<boolean> {
   const transporter = createTransporter();
   if (!transporter) {
@@ -133,12 +134,16 @@ async function sendEmail(
   const config = getEmailConfig();
 
   try {
-    await transporter.sendMail({
+    const mailOptions: any = {
       from: `"Belay App" <${config.from}>`,
       to,
       subject,
       html: htmlContent,
-    });
+    };
+
+    if (replyTo) mailOptions.replyTo = replyTo;
+
+    await transporter.sendMail(mailOptions);
     logger.info(`Email sent successfully to ${to}`);
     return true;
   } catch (error) {
@@ -421,16 +426,18 @@ export const onNewMessage = onDocumentCreated(
       return;
     }
 
-    // Get sender name
+    // Get sender name and email
     const senderProfile = await getUserProfile(senderId);
     const senderName = senderProfile?.displayName || "A climber";
+    const senderEmail = await getUserEmail(senderId);
 
-    // Send email
+    // Send email (set reply-to to the sender so replies go to them)
     const messagePreview = text?.substring(0, 200) || "Sent you a message";
     await sendEmail(
       recipientEmail,
       `New message from ${senderName}`,
-      newMessageEmailTemplate(senderName, messagePreview)
+      newMessageEmailTemplate(senderName, messagePreview),
+      senderEmail || undefined
     );
   }
 );
@@ -473,15 +480,17 @@ export const onNewConnectionRequest = onDocumentCreated(
       return;
     }
 
-    // Get requester name
+    // Get requester name and email
     const requesterProfile = await getUserProfile(userId);
     const requesterName = requesterProfile?.displayName || "A climber";
+    const requesterEmail = await getUserEmail(userId);
 
-    // Send email
+    // Send email (reply-to set to requester)
     await sendEmail(
       recipientEmail,
       `${requesterName} wants to connect with you on Belay`,
-      connectionRequestEmailTemplate(requesterName)
+      connectionRequestEmailTemplate(requesterName),
+      requesterEmail || undefined
     );
   }
 );
@@ -520,15 +529,17 @@ export const onConnectionAccepted = onDocumentUpdated(
         return;
       }
 
-      // Get accepter name
+      // Get accepter name and email
       const accepterProfile = await getUserProfile(matchedUserId);
       const accepterName = accepterProfile?.displayName || "A climber";
+      const accepterEmail = await getUserEmail(matchedUserId);
 
-      // Send email
+      // Send email (reply-to set to accepter)
       await sendEmail(
         requesterEmail,
         `${accepterName} accepted your connection request!`,
-        connectionAcceptedEmailTemplate(accepterName)
+        connectionAcceptedEmailTemplate(accepterName),
+        accepterEmail || undefined
       );
     }
   }

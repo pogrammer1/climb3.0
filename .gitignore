@@ -23,6 +23,12 @@ devnotes.md
 .env.production.local
 .env.belay-91a94 
 
+# Ignore all Markdown files
+*.md
+
+# Except for README.md
+!README.md
+
 # Debug logs
 npm-debug.log*
 yarn-debug.log*

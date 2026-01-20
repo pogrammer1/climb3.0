@@ -24,45 +24,35 @@ import * as logger from "firebase-functions/logger";
 admin.initializeApp();
 
 // Set global options for all functions
+// Force redeploy: 2026-01-20
 setGlobalOptions({maxInstances: 10});
 
 // Firestore reference
 const db = admin.firestore();
 
 // Email configuration from environment variables
-// Set these in .env.local or via Firebase Console
-function getEmailConfig() {
-  return {
-    host: process.env.SMTP_HOST || "",
-    user: process.env.SMTP_USER || "",
-    pass: process.env.SMTP_PASS || "",
-    port: parseInt(process.env.SMTP_PORT || "587", 10),
-    from: process.env.FROM_EMAIL || "noreply@belay-app.com",
-  };
-}
+// Using Gmail SMTP with a dedicated app account
+const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587", 10);
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const FROM_EMAIL = process.env.FROM_EMAIL || "";
 
 /**
- * Create email transporter
+ * Create nodemailer transporter
  */
 function createTransporter(): nodemailer.Transporter | null {
-  const config = getEmailConfig();
-
-  if (!config.host || !config.user || !config.pass) {
-    logger.warn("Email configuration not set. Skipping email send.", {
-      host: !!config.host,
-      user: !!config.user,
-      pass: !!config.pass,
-    });
+  if (!SMTP_USER || !SMTP_PASS) {
+    logger.warn("SMTP credentials not set. Skipping email send.");
     return null;
   }
-
   return nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.port === 465,
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
     auth: {
-      user: config.user,
-      pass: config.pass,
+      user: SMTP_USER,
+      pass: SMTP_PASS,
     },
   });
 }
@@ -118,7 +108,7 @@ function wantsNotificationType(profile: UserProfile, type: string): boolean {
 }
 
 /**
- * Send email notification
+ * Send email notification using Gmail SMTP
  */
 async function sendEmail(
   to: string,
@@ -131,11 +121,9 @@ async function sendEmail(
     return false;
   }
 
-  const config = getEmailConfig();
-
   try {
-    const mailOptions: any = {
-      from: `"Belay App" <${config.from}>`,
+    const mailOptions: nodemailer.SendMailOptions = {
+      from: FROM_EMAIL,
       to,
       subject,
       html: htmlContent,

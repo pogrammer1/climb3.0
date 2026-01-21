@@ -4,12 +4,13 @@ import { StyleSheet, View, ScrollView } from 'react-native';
 import { Text, useTheme, Chip, Divider, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Card, Avatar, Button, LoadingSpinner, EmptyState } from '../../components/common';
-import { useAuthStore, useMatchStore } from '../../store';
+import { Card, Avatar, Button, LoadingSpinner, EmptyState, AchievementBadgeList } from '../../components/common';
+import { useAuthStore, useMatchStore, useAchievementStore } from '../../store';
 import { getProfile } from '../../services/profileService';
 import { getSchedule, formatTimeSlot, findScheduleOverlaps } from '../../services/scheduleService';
 import { getOrCreateConversation } from '../../services/messageService';
-import { ClimberProfile, WeeklySchedule, ScheduleOverlap } from '../../types';
+import { getUserAchievementStats, checkAndAwardAchievements } from '../../services/achievementService';
+import { ClimberProfile, WeeklySchedule, ScheduleOverlap, AchievementProgress } from '../../types';
 import { showAlert } from '../../utils/alert';
 import { useScheduleStore } from '../../store/scheduleStore';
 
@@ -32,6 +33,7 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
   const [climber, setClimber] = useState<ClimberProfile | null>(null);
   const [climberSchedule, setClimberSchedule] = useState<WeeklySchedule | null>(null);
   const [scheduleOverlaps, setScheduleOverlaps] = useState<ScheduleOverlap[]>([]);
+  const [climberAchievements, setClimberAchievements] = useState<AchievementProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sendingRequest, setSendingRequest] = useState(false);
   const [openingChat, setOpeningChat] = useState(false);
@@ -69,6 +71,15 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
       
       if (profileResult.success && profileResult.data) {
         setClimber(profileResult.data as ClimberProfile);
+        
+        // Load achievements for this climber
+        const statsResult = await getUserAchievementStats(climberId);
+        if (statsResult.success && statsResult.data) {
+          const achievementsResult = await checkAndAwardAchievements(climberId, statsResult.data);
+          if (achievementsResult.success && achievementsResult.data) {
+            setClimberAchievements(achievementsResult.data.filter(a => a.isUnlocked));
+          }
+        }
       }
       
       if (scheduleResult.success && scheduleResult.data) {
@@ -250,6 +261,20 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
           </View>
         </Card>
 
+        {/* Achievements */}
+        {climberAchievements.length > 0 && (
+          <Card style={styles.achievementsCard}>
+            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
+              Achievements
+            </Text>
+            <AchievementBadgeList
+              achievements={climberAchievements}
+              maxDisplay={6}
+              size="medium"
+            />
+          </Card>
+        )}
+
         {/* Climbing Types */}
         {climber.climbingTypes && climber.climbingTypes.length > 0 && (
           <Card style={styles.typesCard}>
@@ -399,6 +424,10 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   statsCard: {
+    padding: 16,
+    marginBottom: 16,
+  },
+  achievementsCard: {
     padding: 16,
     marginBottom: 16,
   },

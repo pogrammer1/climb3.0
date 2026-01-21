@@ -120,6 +120,8 @@ export interface ConversationParticipant {
   unreadCount: number;
 }
 
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -127,6 +129,7 @@ export interface Message {
   text: string;
   imageUrl: string | null;
   readBy: string[];
+  status?: MessageStatus;
   createdAt: Date;
 }
 
@@ -272,3 +275,58 @@ export interface ConnectionScheduleMatch {
 }
 
 export type DayOfWeek = 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+
+// Achievement System Types
+export type AchievementCategory = 
+  | 'climbing_hours'
+  | 'sessions_logged'
+  | 'connections_made'
+  | 'messages_sent'
+  | 'app_usage'
+  | 'grades_climbed'
+  | 'years_experience';
+
+export interface AchievementDefinition {
+  id: string;
+  category: AchievementCategory;
+  name: string;
+  description: string;
+  icon: string; // MaterialCommunityIcons name
+  color: string; // hex color
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  requirement: {
+    type: 'count' | 'value' | 'milestone';
+    target: number;
+    unit?: string; // e.g., 'hours', 'sessions', 'V-grade'
+  };
+  order: number; // display order within category
+}
+
+export interface UserAchievement {
+  id: string;
+  odUserId: string;
+  achievementId: string;
+  unlockedAt: Date;
+  progress: number; // current progress towards the achievement
+  notified: boolean; // whether user has been notified of unlock
+}
+
+export interface AchievementProgress {
+  achievementId: string;
+  definition: AchievementDefinition;
+  currentProgress: number;
+  isUnlocked: boolean;
+  unlockedAt?: Date;
+  percentComplete: number;
+}
+
+export interface UserAchievementStats {
+  totalHoursClimbed: number;
+  totalSessions: number;
+  totalConnections: number;
+  totalMessagesSent: number;
+  daysActive: number;
+  highestVGrade: number; // numeric value of V grade (e.g., V5 = 5)
+  highestYDSGrade: string;
+  yearsClimbing: number;
+}

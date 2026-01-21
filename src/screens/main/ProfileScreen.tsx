@@ -1,12 +1,12 @@
 // Profile Screen
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView } from 'react-native';
 import { Text, useTheme, Divider, Switch, List } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Card, Avatar, Button } from '../../components/common';
-import { useAuthStore, useSessionStore, useMatchStore } from '../../store';
+import { Card, Avatar, Button, AchievementBadgeList, AchievementCard } from '../../components/common';
+import { useAuthStore, useSessionStore, useMatchStore, useAchievementStore } from '../../store';
 import { signOut } from '../../services/authService';
 import { uploadProfilePhoto, toggleSearchability } from '../../services/profileService';
 import { showAlert } from '../../utils/alert';
@@ -20,8 +20,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { user, profile, fetchProfile, clearAuth } = useAuthStore();
   const { resetStore: resetSessionStore } = useSessionStore();
   const { clearState: clearMatchState } = useMatchStore();
+  const { achievements, fetchAchievements, getUnlockedAchievements } = useAchievementStore();
   const [isUploading, setIsUploading] = useState(false);
   const [isSearchable, setIsSearchable] = useState(profile?.isSearchable ?? true);
+
+  // Load achievements when user is available
+  useEffect(() => {
+    if (user) {
+      fetchAchievements(user.uid);
+    }
+  }, [user]);
+
+  const unlockedAchievements = getUnlockedAchievements();
 
   const handleEditProfile = () => {
     navigation.navigate('EditProfile');
@@ -204,6 +214,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           )}
         </Card>
 
+        {/* Achievements */}
+        <Card style={styles.section}>
+          <View style={styles.achievementHeader}>
+            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onBackground, marginBottom: 0 }]}>
+              Achievements
+            </Text>
+            <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
+              {unlockedAchievements.length} unlocked
+            </Text>
+          </View>
+          
+          {unlockedAchievements.length > 0 ? (
+            <AchievementBadgeList
+              achievements={achievements}
+              maxDisplay={5}
+              size="medium"
+            />
+          ) : (
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
+              Start climbing and logging sessions to earn achievements!
+            </Text>
+          )}
+        </Card>
+
         {/* Settings */}
         <Card style={styles.section}>
           <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
@@ -246,14 +280,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             title="Privacy"
             left={(props) => <List.Icon {...props} icon="shield-account" />}
             right={(props) => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => navigation.navigate('PrivacySettings')}
+            onPress={() => showAlert('Coming Soon', 'Privacy settings will be available in a future update.')}
           />
 
           <List.Item
             title="Help & Support"
             left={(props) => <List.Icon {...props} icon="help-circle" />}
             right={(props) => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => navigation.navigate('Support')}
+            onPress={() => showAlert('Help & Support', 'For support, please email belay.app.notifications@gmail.com')}
           />
         </Card>
 
@@ -311,6 +345,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontWeight: '600',
+    marginBottom: 16,
+  },
+  achievementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
   },
   statsRow: {

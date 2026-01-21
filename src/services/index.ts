@@ -7,3 +7,4 @@ export * from './messageService';
 export * from './gymService';
 export * from './scheduleService';
 export * from './notificationService';
+export * from './achievementService';

@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Avatar, LoadingSpinner } from '../../components/common';
 import { useAuthStore, useMessageStore } from '../../store';
-import { Message } from '../../types';
+import { Message, MessageStatus } from '../../types';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
 interface ChatScreenProps {
@@ -112,6 +112,68 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
     </View>
   );
 
+  // Get message status for read receipts
+  const getMessageStatus = (message: Message): MessageStatus => {
+    if (!user) return 'sent';
+    
+    // If the other participant has read this message
+    const otherParticipantId = currentConversation 
+      ? Object.keys((currentConversation as any).participants || {}).find(id => id !== user.uid)
+      : null;
+    
+    if (otherParticipantId && message.readBy?.includes(otherParticipantId)) {
+      return 'read';
+    }
+    
+    // Message exists in Firestore, so it's delivered
+    if (message.id && !message.id.startsWith('temp_')) {
+      return 'delivered';
+    }
+    
+    return message.status || 'sent';
+  };
+
+  // Render message status icon
+  const renderMessageStatus = (message: Message) => {
+    if (message.senderId !== user?.uid) return null;
+    
+    const status = getMessageStatus(message);
+    
+    let iconName: string;
+    let iconColor: string;
+    
+    switch (status) {
+      case 'sending':
+        iconName = 'clock-outline';
+        iconColor = theme.colors.onPrimary + '80';
+        break;
+      case 'sent':
+        iconName = 'check';
+        iconColor = theme.colors.onPrimary + '99';
+        break;
+      case 'delivered':
+        iconName = 'check-all';
+        iconColor = theme.colors.onPrimary + '99';
+        break;
+      case 'read':
+        iconName = 'check-all';
+        iconColor = '#4FC3F7'; // Light blue for read
+        break;
+      default:
+        iconName = 'check';
+        iconColor = theme.colors.onPrimary + '99';
+    }
+    
+    return (
+      <MaterialCommunityIcons
+        name={iconName as any}
+        size={14}
+        color={iconColor}
+        style={styles.statusIcon}
+      />
+    );
+  };
+
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const isOwnMessage = item.senderId === user?.uid;
     const previousMessage = messages[index - 1];
@@ -142,14 +204,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
             >
               {item.text}
             </Text>
-            <Text
-              style={[
-                styles.messageTime,
-                { color: isOwnMessage ? theme.colors.onPrimary + '99' : theme.colors.onSurfaceVariant + '99' },
-              ]}
-            >
-              {formatMessageTime(new Date(item.createdAt))}
-            </Text>
+            <View style={styles.messageFooter}>
+              <Text
+                style={[
+                  styles.messageTime,
+                  { color: isOwnMessage ? theme.colors.onPrimary + '99' : theme.colors.onSurfaceVariant + '99' },
+                ]}
+              >
+                {formatMessageTime(new Date(item.createdAt))}
+              </Text>
+              {renderMessageStatus(item)}
+            </View>
           </View>
         </View>
       </>
@@ -292,10 +357,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
   messageTime: {
     fontSize: 11,
-    marginTop: 4,
-    alignSelf: 'flex-end',
+  },
+  statusIcon: {
+    marginLeft: 4,
   },
   inputContainer: {
     padding: 8,

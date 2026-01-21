@@ -5,7 +5,7 @@ import { useTheme } from 'react-native-paper';
 import { MainTabNavigator } from './MainTabNavigator';
 import { NewSessionScreen, SessionDetailScreen, EditSessionScreen } from '../screens/session';
 import { ChatScreen } from '../screens/chat';
-import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen } from '../screens/profile';
+import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen, AccountSettingsScreen, NotificationSettingsScreen } from '../screens/profile';
 import { ConnectionScheduleScreen, MyScheduleScreen } from '../screens/schedule';
 import { RootStackParamList } from './types';
 
@@ -47,6 +47,14 @@ export const RootNavigator: React.FC = () => {
         name="EditProfile"
         component={EditProfileScreen}
         options={{ presentation: 'modal' }}
+      />
+      <Stack.Screen
+        name="AccountSettings"
+        component={AccountSettingsScreen}
+      />
+      <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
       />
     </Stack.Navigator>
   );

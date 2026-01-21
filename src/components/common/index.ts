@@ -12,3 +12,4 @@ export { SchedulePicker } from './SchedulePicker';
 export { NotificationProvider } from './NotificationProvider';
 export { NotificationBanner } from './NotificationBanner';
 export { Logo } from './Logo';
+export { AchievementBadge, AchievementBadgeList, AchievementCard } from './AchievementBadge';

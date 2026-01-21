@@ -31,6 +31,8 @@ export type RootStackParamList = {
   ConnectionSchedule: undefined;
   MySchedule: undefined;
   Settings: undefined;
+  AccountSettings: undefined;
+  NotificationSettings: undefined;
 };
 
 // Combined navigation types

@@ -9,8 +9,9 @@ A cross-platform (iOS, Android, Web) application for rock climbers to log sessio
 - **Real-time Messaging**: Chat with other climbers about beta, trips, and more
 - **Location-based Discovery**: Find climbers in your area
 - **Scheduling System**: Schedule climbing days with connections
+- **Notification system**: Get emails for messages and connection requests
+
 ## Upcoming Features
-- Notification system
 - Achievement system
 - Mobile app (just browser right now on web/mobile)
 

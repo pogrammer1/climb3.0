@@ -27,7 +27,7 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
   const { climberId } = route.params;
   const theme = useTheme();
   const { user } = useAuthStore();
-  const { sendRequest, getCompatibilityScore, acceptedMatches, fetchAcceptedMatches } = useMatchStore();
+  const { sendRequest, acceptedMatches, fetchAcceptedMatches } = useMatchStore();
   const { profile: myProfile } = useAuthStore();
 
   const [climber, setClimber] = useState<ClimberProfile | null>(null);
@@ -160,8 +160,6 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
     );
   }
 
-  const compatibilityScore = myProfile ? getCompatibilityScore(myProfile, climber) : 0;
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
@@ -191,13 +189,6 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
                   <MaterialCommunityIcons name="map-marker" size={16} color={theme.colors.onSurfaceVariant} />
                   <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }}>
                     {climber.location.city}, {climber.location.state}
-                  </Text>
-                </View>
-              )}
-              {compatibilityScore > 0 && (
-                <View style={[styles.compatBadge, { backgroundColor: theme.colors.primaryContainer }]}>
-                  <Text variant="labelMedium" style={{ color: theme.colors.onPrimaryContainer }}>
-                    {compatibilityScore}% match
                   </Text>
                 </View>
               )}

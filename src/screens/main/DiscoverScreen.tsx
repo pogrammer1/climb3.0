@@ -45,7 +45,6 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
     fetchMatchedProfiles,
     setFilters,
     sendRequest,
-    getCompatibilityScore,
   } = useMatchStore();
 
   const [showFilters, setShowFilters] = useState(false);
@@ -196,8 +195,6 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   const newClimbers = discoveredClimbers.filter(c => !connectedUserIds.has(c.uid));
 
   const renderClimberCard = (item: ClimberProfile, isConnected: boolean = false) => {
-    const compatibilityScore = myProfile ? getCompatibilityScore(myProfile, item) : 0;
-
     return (
       <Card key={item.uid} style={styles.climberCard}>
         <View style={styles.cardHeader}>
@@ -227,13 +224,6 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
               </Text>
             )}
           </View>
-          {compatibilityScore > 0 && (
-            <View style={[styles.compatBadge, { backgroundColor: theme.colors.primaryContainer }]}>
-              <Text variant="labelSmall" style={{ color: theme.colors.onPrimaryContainer }}>
-                {compatibilityScore}%
-              </Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.cardActions}>

@@ -87,7 +87,22 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     }
     
     const unsubscribe = subscribeToConversations(userId, (conversations) => {
-      set({ conversations });
+      // Calculate total unread count from conversations
+      let totalUnread = 0;
+      conversations.forEach((conversation) => {
+        // Use participantsMap which keeps the original map structure
+        const participantsMap = (conversation as any).participantsMap || 
+                                (conversation as any).participants;
+        if (typeof participantsMap === 'object' && !Array.isArray(participantsMap)) {
+          const userParticipant = participantsMap[userId];
+          if (userParticipant) {
+            totalUnread += userParticipant.unreadCount || 0;
+          }
+        }
+      });
+      
+      console.log('[MessageStore] Total unread count:', totalUnread, 'for user:', userId);
+      set({ conversations, totalUnreadCount: totalUnread });
     });
     
     set({ conversationUnsubscribe: unsubscribe });

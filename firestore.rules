@@ -39,6 +39,26 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId);
       allow delete: if isOwner(userId);
+      
+      // Achievements subcollection
+      match /achievements/{achievementId} {
+        // Anyone authenticated can read achievements (to see on profiles)
+        allow read: if isAuthenticated();
+        
+        // Only the user can write their own achievements
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+      
+      // Stats subcollection (messaging stats, etc.)
+      match /stats/{statId} {
+        // Only the user can read/write their own stats
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
     }
     
     // Sessions collection

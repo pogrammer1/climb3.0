@@ -1,6 +1,6 @@
 // Climber Profile Screen - View another climber's profile
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
 import { Text, useTheme, Chip, Divider, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -263,16 +263,22 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
 
         {/* Achievements */}
         {climberAchievements.length > 0 && (
-          <Card style={styles.achievementsCard}>
-            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>
-              Achievements
-            </Text>
-            <AchievementBadgeList
-              achievements={climberAchievements}
-              maxDisplay={6}
-              size="medium"
-            />
-          </Card>
+          <Pressable onPress={() => navigation.navigate('Achievements', { userId: climberId })}>
+            <Card style={styles.achievementsCard}>
+              <View style={styles.achievementHeader}>
+                <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onSurface, marginBottom: 0 }]}>
+                  Achievements
+                </Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={theme.colors.primary} />
+              </View>
+              <AchievementBadgeList
+                achievements={climberAchievements}
+                maxDisplay={6}
+                size="medium"
+                onSeeAll={() => navigation.navigate('Achievements', { userId: climberId })}
+              />
+            </Card>
+          </Pressable>
         )}
 
         {/* Climbing Types */}
@@ -430,6 +436,12 @@ const styles = StyleSheet.create({
   achievementsCard: {
     padding: 16,
     marginBottom: 16,
+  },
+  achievementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   sectionTitle: {
     marginBottom: 12,

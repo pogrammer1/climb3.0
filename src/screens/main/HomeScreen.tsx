@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Card, Avatar, Button, LoadingSpinner, NotificationBanner } from '../../components/common';
-import { useAuthStore, useSessionStore, useMatchStore } from '../../store';
+import { useAuthStore, useSessionStore, useMatchStore, useMessageStore } from '../../store';
 
 interface HomeScreenProps {
   navigation: any;
@@ -17,6 +17,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { user, profile } = useAuthStore();
   const { sessions, stats, isLoading: sessionsLoading, fetchSessions, fetchStats } = useSessionStore();
   const { pendingRequests, fetchPendingRequests } = useMatchStore();
+  const { fetchUnreadCount, subscribeToUserConversations } = useMessageStore();
 
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -27,9 +28,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         fetchSessions(user.uid);
         fetchStats(user.uid);
         fetchPendingRequests(user.uid);
+        fetchUnreadCount(user.uid);
       }
     }, [user])
   );
+
+  // Subscribe to conversations for real-time unread count updates
+  useEffect(() => {
+    if (user) {
+      subscribeToUserConversations(user.uid);
+    }
+  }, [user]);
 
   const onRefresh = async () => {
     if (!user) return;
@@ -38,6 +47,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       fetchSessions(user.uid, true),
       fetchStats(user.uid),
       fetchPendingRequests(user.uid),
+      fetchUnreadCount(user.uid),
     ]);
     setRefreshing(false);
   };

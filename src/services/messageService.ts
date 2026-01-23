@@ -122,11 +122,12 @@ export const findExistingConversation = async (
     return {
       id: docSnap.id,
       ...data,
+      participantsMap: data.participants || {}, // Keep original map for unread counts
       participants: Object.values(data.participants || {}),
       lastMessageAt: data.lastMessageAt?.toDate() || null,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
-    } as Conversation;
+    } as unknown as Conversation;
   } catch (error) {
     console.error('Find existing conversation error:', error);
     return null;
@@ -154,11 +155,12 @@ export const getUserConversations = async (
       conversations.push({
         id: docSnap.id,
         ...data,
+        participantsMap: data.participants || {}, // Keep original map for unread counts
         participants: Object.values(data.participants || {}),
         lastMessageAt: data.lastMessageAt?.toDate() || null,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
-      } as Conversation);
+      } as unknown as Conversation);
     });
     
     return {
@@ -316,21 +318,27 @@ export const markMessagesAsRead = async (
       });
     }
     
-    // Mark individual messages as read
-    const messagesQuery = query(
-      collection(db, COLLECTIONS.CONVERSATIONS, conversationId, COLLECTIONS.MESSAGES),
-      where('readBy', 'not-in', [[userId]])
-    );
+    // Mark individual messages as read - get all messages and filter client-side
+    const messagesRef = collection(db, COLLECTIONS.CONVERSATIONS, conversationId, COLLECTIONS.MESSAGES);
+    const messagesSnap = await getDocs(messagesRef);
     
-    const messagesSnap = await getDocs(messagesQuery);
+    const updatePromises: Promise<void>[] = [];
     
-    const updatePromises = messagesSnap.docs.map((docSnap) =>
-      updateDoc(docSnap.ref, {
-        readBy: arrayUnion(userId),
-      })
-    );
+    messagesSnap.docs.forEach((docSnap) => {
+      const messageData = docSnap.data();
+      // Only update messages not already read by this user
+      if (!messageData.readBy?.includes(userId)) {
+        updatePromises.push(
+          updateDoc(docSnap.ref, {
+            readBy: arrayUnion(userId),
+          })
+        );
+      }
+    });
     
-    await Promise.all(updatePromises);
+    if (updatePromises.length > 0) {
+      await Promise.all(updatePromises);
+    }
     
     return {
       success: true,
@@ -357,18 +365,25 @@ export const subscribeToMessages = (
     orderBy('createdAt', 'asc')
   );
   
-  return onSnapshot(q, (querySnapshot) => {
-    const messages: Message[] = [];
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      messages.push({
-        id: docSnap.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-      } as Message);
-    });
-    callback(messages);
-  });
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      const messages: Message[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        messages.push({
+          id: docSnap.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+        } as Message);
+      });
+      callback(messages);
+    },
+    (error) => {
+      // Handle permission errors gracefully (e.g., user logged out)
+      console.warn('[MessageService] Messages subscription error:', error.code || error.message);
+    }
+  );
 };
 
 /**
@@ -384,21 +399,31 @@ export const subscribeToConversations = (
     orderBy('lastMessageAt', 'desc')
   );
   
-  return onSnapshot(q, (querySnapshot) => {
-    const conversations: Conversation[] = [];
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      conversations.push({
-        id: docSnap.id,
-        ...data,
-        participants: Object.values(data.participants || {}),
-        lastMessageAt: data.lastMessageAt?.toDate() || null,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-      } as Conversation);
-    });
-    callback(conversations);
-  });
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      const conversations: Conversation[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        // Keep the original participants map for unread counts and read receipts
+        const conversationWithMap = {
+          id: docSnap.id,
+          ...data,
+          participantsMap: data.participants || {}, // Keep original map
+          participants: Object.values(data.participants || {}),
+          lastMessageAt: data.lastMessageAt?.toDate() || null,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as unknown as Conversation;
+        conversations.push(conversationWithMap);
+      });
+      callback(conversations);
+    },
+    (error) => {
+      // Handle permission errors gracefully (e.g., user logged out)
+      console.warn('[MessageService] Conversation subscription error:', error.code || error.message);
+    }
+  );
 };
 
 /**
@@ -413,7 +438,9 @@ export const getTotalUnreadCount = async (userId: string): Promise<number> => {
     
     let totalUnread = 0;
     for (const conversation of conversationsResult.data) {
-      const participantData = (conversation as any).participants?.[userId];
+      // Use participantsMap which keeps the original map structure
+      const participantsMap = (conversation as any).participantsMap || {};
+      const participantData = participantsMap[userId];
       if (participantData) {
         totalUnread += participantData.unreadCount || 0;
       }

@@ -38,10 +38,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({ navigation }) =>
     if (user) {
       subscribeToUserConversations(user.uid);
     }
-
-    return () => {
-      cleanup();
-    };
+    // Don't cleanup here - HomeScreen manages the subscription lifecycle
   }, [user]);
 
   const handleRefresh = useCallback(() => {

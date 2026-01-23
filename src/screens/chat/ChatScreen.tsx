@@ -4,6 +4,7 @@ import { StyleSheet, View, FlatList, KeyboardAvoidingView, Platform, Pressable, 
 import { Text, useTheme, TextInput, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Avatar, LoadingSpinner } from '../../components/common';
 import { useAuthStore, useMessageStore } from '../../store';
 import { Message, MessageStatus } from '../../types';
@@ -46,11 +47,21 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
     };
   }, [conversationId]);
 
+  // Mark messages as read when conversation opens (not on every message change)
   useEffect(() => {
-    if (user && conversationId) {
+    if (user && conversationId && currentConversation) {
       markAsRead(conversationId, user.uid);
     }
-  }, [messages, user, conversationId]);
+  }, [conversationId, user?.uid, currentConversation?.id]);
+
+  // Also mark as read when screen comes back into focus (user returns to chat)
+  useFocusEffect(
+    useCallback(() => {
+      if (user && conversationId) {
+        markAsRead(conversationId, user.uid);
+      }
+    }, [user, conversationId])
+  );
 
   const getOtherParticipant = () => {
     if (!currentConversation || !user) return { displayName: 'Chat', photoURL: null };
@@ -117,8 +128,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
     if (!user) return 'sent';
     
     // If the other participant has read this message
-    const otherParticipantId = currentConversation 
-      ? Object.keys((currentConversation as any).participants || {}).find(id => id !== user.uid)
+    // Use participantsMap which keeps the original map structure
+    const participantsMap = (currentConversation as any)?.participantsMap || 
+                            (currentConversation as any)?.participants || {};
+    
+    const otherParticipantId = typeof participantsMap === 'object' && !Array.isArray(participantsMap)
+      ? Object.keys(participantsMap).find(id => id !== user.uid)
       : null;
     
     if (otherParticipantId && message.readBy?.includes(otherParticipantId)) {

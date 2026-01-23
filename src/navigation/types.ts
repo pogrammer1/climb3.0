@@ -33,6 +33,7 @@ export type RootStackParamList = {
   Settings: undefined;
   AccountSettings: undefined;
   NotificationSettings: undefined;
+  Achievements: { userId?: string } | undefined;
 };
 
 // Combined navigation types

@@ -5,7 +5,7 @@ import { useTheme } from 'react-native-paper';
 import { MainTabNavigator } from './MainTabNavigator';
 import { NewSessionScreen, SessionDetailScreen, EditSessionScreen } from '../screens/session';
 import { ChatScreen } from '../screens/chat';
-import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen, AccountSettingsScreen, NotificationSettingsScreen } from '../screens/profile';
+import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen, AccountSettingsScreen, NotificationSettingsScreen, AchievementsScreen } from '../screens/profile';
 import { ConnectionScheduleScreen, MyScheduleScreen } from '../screens/schedule';
 import { RootStackParamList } from './types';
 
@@ -55,6 +55,10 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen
         name="NotificationSettings"
         component={NotificationSettingsScreen}
+      />
+      <Stack.Screen
+        name="Achievements"
+        component={AchievementsScreen as React.ComponentType<{}>}
       />
     </Stack.Navigator>
   );

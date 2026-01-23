@@ -4,3 +4,4 @@ export { ClimberProfileScreen } from './ClimberProfileScreen';
 export { MatchRequestsScreen } from './MatchRequestsScreen';
 export { AccountSettingsScreen } from './AccountSettingsScreen';
 export { NotificationSettingsScreen } from './NotificationSettingsScreen';
+export { AchievementsScreen } from './AchievementsScreen';

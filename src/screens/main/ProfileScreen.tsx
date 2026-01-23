@@ -1,9 +1,10 @@
 // Profile Screen
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
 import { Text, useTheme, Divider, Switch, List } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Card, Avatar, Button, AchievementBadgeList, AchievementCard } from '../../components/common';
 import { useAuthStore, useSessionStore, useMatchStore, useAchievementStore } from '../../store';
@@ -20,16 +21,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { user, profile, fetchProfile, clearAuth } = useAuthStore();
   const { resetStore: resetSessionStore } = useSessionStore();
   const { clearState: clearMatchState } = useMatchStore();
-  const { achievements, fetchAchievements, getUnlockedAchievements } = useAchievementStore();
+  const { achievements, fetchAchievements, getUnlockedAchievements, isLoading: achievementsLoading } = useAchievementStore();
   const [isUploading, setIsUploading] = useState(false);
   const [isSearchable, setIsSearchable] = useState(profile?.isSearchable ?? true);
 
-  // Load achievements when user is available
-  useEffect(() => {
-    if (user) {
-      fetchAchievements(user.uid);
-    }
-  }, [user]);
+  // Load achievements when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        fetchAchievements(user.uid);
+      }
+    }, [user])
+  );
 
   const unlockedAchievements = getUnlockedAchievements();
 
@@ -215,28 +218,34 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         </Card>
 
         {/* Achievements */}
-        <Card style={styles.section}>
-          <View style={styles.achievementHeader}>
-            <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onBackground, marginBottom: 0 }]}>
-              Achievements
-            </Text>
-            <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
-              {unlockedAchievements.length} unlocked
-            </Text>
-          </View>
-          
-          {unlockedAchievements.length > 0 ? (
-            <AchievementBadgeList
-              achievements={achievements}
-              maxDisplay={5}
-              size="medium"
-            />
-          ) : (
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
-              Start climbing and logging sessions to earn achievements!
-            </Text>
-          )}
-        </Card>
+        <Pressable onPress={() => navigation.navigate('Achievements')}>
+          <Card style={styles.section}>
+            <View style={styles.achievementHeader}>
+              <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onBackground, marginBottom: 0 }]}>
+                Achievements
+              </Text>
+              <View style={styles.achievementHeaderRight}>
+                <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
+                  {unlockedAchievements.length} unlocked
+                </Text>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={theme.colors.primary} />
+              </View>
+            </View>
+            
+            {unlockedAchievements.length > 0 ? (
+              <AchievementBadgeList
+                achievements={achievements}
+                maxDisplay={5}
+                size="medium"
+                onSeeAll={() => navigation.navigate('Achievements')}
+              />
+            ) : (
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
+                Start climbing and logging sessions to earn achievements!
+              </Text>
+            )}
+          </Card>
+        </Pressable>
 
         {/* Settings */}
         <Card style={styles.section}>
@@ -352,6 +361,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  achievementHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   statsRow: {
     flexDirection: 'row',

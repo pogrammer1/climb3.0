@@ -307,22 +307,51 @@ export const getUserAchievementStats = async (userId: string): Promise<ApiRespon
     const profileRef = doc(db, COLLECTIONS.PROFILES, userId);
     const profileSnap = await getDoc(profileRef);
     const profileData = profileSnap.data();
-    
-    // Get sessions for climbing stats
+
+    // If server-side aggregated public stats exist on the profile, use them (preferred)
+    const publicStats = profileData?.publicStats;
+    if (publicStats) {
+      const totalHoursClimbed = publicStats.totalHoursClimbed || 0;
+      const totalSessions = publicStats.totalSessions || 0;
+      const totalConnections = publicStats.totalConnections || 0;
+      const totalMessagesSent = publicStats.totalMessagesSent || 0;
+      const highestVGrade = publicStats.highestVGrade || 0;
+      const highestYDSGrade = publicStats.highestYDSGrade || '';
+      const yearsClimbing = publicStats.yearsClimbing || 0;
+
+      const createdAt = profileData?.createdAt?.toDate ? profileData.createdAt.toDate() : profileData?.createdAt || new Date();
+      const daysActive = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+      return {
+        success: true,
+        data: {
+          totalHoursClimbed: Math.round(totalHoursClimbed * 10) / 10,
+          totalSessions,
+          totalConnections,
+          totalMessagesSent,
+          daysActive: Math.max(1, daysActive),
+          highestVGrade,
+          highestYDSGrade,
+          yearsClimbing,
+        },
+      };
+    }
+
+    // Get sessions for climbing stats (fallback when no aggregated stats exist)
     const sessionsQuery = query(
       collection(db, COLLECTIONS.SESSIONS),
       where('userId', '==', userId)
     );
     const sessionsSnap = await getDocs(sessionsQuery);
-    
+
     let totalHoursClimbed = 0;
     let totalSessions = sessionsSnap.size;
-    
+
     sessionsSnap.forEach((docSnap) => {
       const session = docSnap.data();
       totalHoursClimbed += (session.duration || 0) / 60; // Convert minutes to hours
     });
-    
+
     // Get connections count
     const matchesQuery = query(
       collection(db, COLLECTIONS.MATCHES),
@@ -330,16 +359,16 @@ export const getUserAchievementStats = async (userId: string): Promise<ApiRespon
       where('status', '==', 'accepted')
     );
     const matchesSnap = await getDocs(matchesQuery);
-    
+
     const matchesQuery2 = query(
       collection(db, COLLECTIONS.MATCHES),
       where('matchedUserId', '==', userId),
       where('status', '==', 'accepted')
     );
     const matchesSnap2 = await getDocs(matchesQuery2);
-    
+
     const totalConnections = matchesSnap.size + matchesSnap2.size;
-    
+
     // Get messages sent count
     const statsRef = doc(db, COLLECTIONS.PROFILES, userId, 'stats', 'messaging');
     const statsSnap = await getDoc(statsRef);

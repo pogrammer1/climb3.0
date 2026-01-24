@@ -11,10 +11,12 @@
 import {
   onDocumentCreated,
   onDocumentUpdated,
+  onDocumentDeleted,
   FirestoreEvent,
   QueryDocumentSnapshot,
   Change,
 } from "firebase-functions/v2/firestore";
+import { onRequest } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
@@ -532,4 +534,326 @@ export const onConnectionAccepted = onDocumentUpdated(
     }
   }
 );
+
+/**
+ * Helper: increment/decrement public stats on the user's profile
+ */
+async function incrementPublicStats(userId: string, fields: Record<string, any>) {
+  try {
+    const profileRef = db.collection("profiles").doc(userId);
+    // Build update payload using FieldValue.increment when numeric deltas are provided
+    const updatePayload: Record<string, any> = {};
+    for (const key of Object.keys(fields)) {
+      const value = fields[key];
+      if (typeof value === "number") {
+        updatePayload[`publicStats.${key}`] = admin.firestore.FieldValue.increment(value as number);
+      } else {
+        updatePayload[`publicStats.${key}`] = value;
+      }
+    }
+
+    await profileRef.set(updatePayload, { merge: true });
+  } catch (err) {
+    logger.error("Error incrementing public stats for", userId, err);
+  }
+}
+
+/**
+ * Helper: set highest numeric V grade if higher than existing
+ */
+async function setHighestVGradeIfHigher(userId: string, newGrade: number) {
+  try {
+    const profileRef = db.collection("profiles").doc(userId);
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(profileRef);
+      const current = doc.data()?.publicStats?.highestVGrade || 0;
+      if (newGrade > current) {
+        tx.update(profileRef, { "publicStats.highestVGrade": newGrade });
+      }
+    });
+  } catch (err) {
+    logger.error("Error setting highest V grade for", userId, err);
+  }
+}
+
+/**
+ * Sessions aggregation: create
+ */
+export const onSessionCreatedAgg = onDocumentCreated(
+  "sessions/{sessionId}",
+  async (event: FirestoreEvent<QueryDocumentSnapshot | undefined, { sessionId: string }>) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data();
+    const userId = data?.userId;
+    const duration = data?.duration || 0;
+    const hours = (duration || 0) / 60;
+    if (!userId) return;
+    await incrementPublicStats(userId, { totalSessions: 1, totalHoursClimbed: hours });
+  }
+);
+
+/**
+ * Sessions aggregation: update
+ */
+export const onSessionUpdatedAgg = onDocumentUpdated(
+  "sessions/{sessionId}",
+  async (event: FirestoreEvent<Change<QueryDocumentSnapshot> | undefined, { sessionId: string }>) => {
+    if (!event.data) return;
+    const before = event.data.before?.data();
+    const after = event.data.after?.data();
+    if (!before || !after) return;
+
+    const beforeUser = before.userId;
+    const afterUser = after.userId;
+    const beforeHours = (before.duration || 0) / 60;
+    const afterHours = (after.duration || 0) / 60;
+
+    // If user changed, decrement old and increment new
+    if (beforeUser && afterUser && beforeUser !== afterUser) {
+      await incrementPublicStats(beforeUser, { totalSessions: -1, totalHoursClimbed: -beforeHours });
+      await incrementPublicStats(afterUser, { totalSessions: 1, totalHoursClimbed: afterHours });
+      return;
+    }
+
+    // Same user: adjust hours by delta
+    if (afterUser) {
+      const deltaHours = afterHours - beforeHours;
+      if (Math.abs(deltaHours) > 0) {
+        await incrementPublicStats(afterUser, { totalHoursClimbed: deltaHours });
+      }
+    }
+  }
+);
+
+/**
+ * Sessions aggregation: delete
+ */
+export const onSessionDeletedAgg = onDocumentDeleted(
+  "sessions/{sessionId}",
+  async (event: FirestoreEvent<QueryDocumentSnapshot | undefined, { sessionId: string }>) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data();
+    const userId = data?.userId;
+    const duration = data?.duration || 0;
+    const hours = duration / 60;
+    if (!userId) return;
+    await incrementPublicStats(userId, { totalSessions: -1, totalHoursClimbed: -hours });
+  }
+);
+
+/**
+ * Matches aggregation: handle accepted connections count for both users
+ */
+export const onMatchCreatedAgg = onDocumentCreated(
+  "matches/{matchId}",
+  async (event: FirestoreEvent<QueryDocumentSnapshot | undefined, { matchId: string }>) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data();
+    const { userId, matchedUserId, status } = data || {};
+    if (status === "accepted") {
+      if (userId) await incrementPublicStats(userId, { totalConnections: 1 });
+      if (matchedUserId) await incrementPublicStats(matchedUserId, { totalConnections: 1 });
+    }
+  }
+);
+
+export const onMatchUpdatedAgg = onDocumentUpdated(
+  "matches/{matchId}",
+  async (event: FirestoreEvent<Change<QueryDocumentSnapshot> | undefined, { matchId: string }>) => {
+    if (!event.data) return;
+    const before = event.data.before?.data();
+    const after = event.data.after?.data();
+    if (!before || !after) return;
+
+    const beforeAccepted = before.status === "accepted";
+    const afterAccepted = after.status === "accepted";
+    const userId = after.userId;
+    const matchedUserId = after.matchedUserId;
+
+    if (!beforeAccepted && afterAccepted) {
+      if (userId) await incrementPublicStats(userId, { totalConnections: 1 });
+      if (matchedUserId) await incrementPublicStats(matchedUserId, { totalConnections: 1 });
+    } else if (beforeAccepted && !afterAccepted) {
+      if (userId) await incrementPublicStats(userId, { totalConnections: -1 });
+      if (matchedUserId) await incrementPublicStats(matchedUserId, { totalConnections: -1 });
+    }
+  }
+);
+
+export const onMatchDeletedAgg = onDocumentDeleted(
+  "matches/{matchId}",
+  async (event: FirestoreEvent<QueryDocumentSnapshot | undefined, { matchId: string }>) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data();
+    const { userId, matchedUserId, status } = data || {};
+    if (status === "accepted") {
+      if (userId) await incrementPublicStats(userId, { totalConnections: -1 });
+      if (matchedUserId) await incrementPublicStats(matchedUserId, { totalConnections: -1 });
+    }
+  }
+);
+
+/**
+ * Messages aggregation: increment sender's message count
+ */
+// Enhance existing onNewMessage by incrementing the sender's publicStats.totalMessagesSent
+// Note: this runs alongside the email notification logic above
+// (we intentionally don't export a second onNewMessage handler to avoid conflicts)
+// Instead add an additional exported trigger bound to the same path.
+export const onNewMessageAgg = onDocumentCreated(
+  "conversations/{conversationId}/messages/{messageId}",
+  async (event: FirestoreEvent<QueryDocumentSnapshot | undefined, { conversationId: string; messageId: string }>) => {
+    const snap = event.data;
+    if (!snap) return;
+    const data = snap.data() as Record<string, unknown>;
+    const senderId = data?.senderId as string | undefined;
+    if (!senderId) return;
+    await incrementPublicStats(senderId, { totalMessagesSent: 1 });
+  }
+);
+
+/**
+ * Profile write: update derived public stats (createdAt, highest grades, years)
+ */
+export const onProfileWriteAgg = onDocumentUpdated(
+  "profiles/{userId}",
+  async (event: FirestoreEvent<Change<QueryDocumentSnapshot> | undefined, { userId: string }>) => {
+    if (!event.data) return;
+    const after = event.data.after?.data();
+    if (!after) return;
+    const userId = event.params.userId;
+
+    // createdAt -> store if present
+    if (after.createdAt) {
+      await incrementPublicStats(userId, { createdAt: after.createdAt });
+    }
+
+    // yearsClimbing, highestGradeBouldering, highestGradeYDS
+    if (after.yearsClimbing !== undefined) {
+      await incrementPublicStats(userId, { yearsClimbing: after.yearsClimbing });
+    }
+
+    if (after.highestGradeBouldering) {
+      const vGradeStr = after.highestGradeBouldering;
+      if (typeof vGradeStr === "string" && vGradeStr.startsWith("V") && vGradeStr !== "VB") {
+        const num = parseInt(vGradeStr.substring(1)) || 0;
+        if (num > 0) await setHighestVGradeIfHigher(userId, num);
+      }
+    }
+
+    if (after.highestGradeYDS) {
+      await incrementPublicStats(userId, { highestYDSGrade: after.highestGradeYDS });
+    }
+  }
+);
+
+/**
+ * One-time backfill HTTP function to populate publicStats for all profiles.
+ * Call via: https://<region>-<project>.cloudfunctions.net/backfillPublicStats
+ * or: firebase functions:call backfillPublicStats
+ */
+export const backfillPublicStats = onRequest(
+  { timeoutSeconds: 540, memory: "512MiB" },
+  async (req, res) => {
+    logger.info("Starting backfillPublicStats...");
+
+    const profilesSnap = await db.collection("profiles").get();
+    let updated = 0;
+    let skipped = 0;
+
+    for (const profileDoc of profilesSnap.docs) {
+      const userId = profileDoc.id;
+      const profileData = profileDoc.data();
+
+      // Skip if publicStats already present
+      if (profileData.publicStats) {
+        skipped++;
+        continue;
+      }
+
+      // Compute stats from sessions
+      const sessionsSnap = await db
+        .collection("sessions")
+        .where("userId", "==", userId)
+        .get();
+      let totalHoursClimbed = 0;
+      const totalSessions = sessionsSnap.size;
+      sessionsSnap.forEach((s) => {
+        totalHoursClimbed += ((s.data().duration as number) || 0) / 60;
+      });
+
+      // Compute connections (accepted matches where user is either side)
+      const matchesSnap1 = await db
+        .collection("matches")
+        .where("userId", "==", visibleUserId(userId))
+        .where("status", "==", "accepted")
+        .get();
+      const matchesSnap2 = await db
+        .collection("matches")
+        .where("matchedUserId", "==", visibleUserId(userId))
+        .where("status", "==", "accepted")
+        .get();
+      const totalConnections = matchesSnap1.size + matchesSnap2.size;
+
+      // Messages sent
+      const statsDoc = await db
+        .collection("profiles")
+        .doc(userId)
+        .collection("stats")
+        .doc("messaging")
+        .get();
+      const totalMessagesSent = (statsDoc.data()?.messagesSent as number) || 0;
+
+      // Derived from profile
+      const createdAt = profileData.createdAt || null;
+      const yearsClimbing = profileData.yearsClimbing || 0;
+      const highestYDSGrade = profileData.highestGradeYDS || "";
+
+      let highestVGrade = 0;
+      const vGradeStr = profileData.highestGradeBouldering;
+      if (
+        typeof vGradeStr === "string" &&
+        vGradeStr.startsWith("V") &&
+        vGradeStr !== "VB"
+      ) {
+        highestVGrade = parseInt(vGradeStr.substring(1)) || 0;
+      }
+
+      await db
+        .collection("profiles")
+        .doc(userId)
+        .set(
+          {
+            publicStats: {
+              totalHoursClimbed: Math.round(totalHoursClimbed * 10) / 10,
+              totalSessions,
+              totalConnections,
+              totalMessagesSent,
+              highestVGrade,
+              highestYDSGrade,
+              yearsClimbing,
+              createdAt,
+            },
+          },
+          { merge: true }
+        );
+
+      updated++;
+      logger.info(`Backfilled publicStats for ${userId}`);
+    }
+
+    const msg = `Backfill complete. Updated: ${updated}, Skipped (already had publicStats): ${skipped}`;
+    logger.info(msg);
+    res.status(200).send(msg);
+  }
+);
+
+// Helper to return userId (no-op, but keeps query type correct)
+function visibleUserId(uid: string): string {
+  return uid;
+}
 

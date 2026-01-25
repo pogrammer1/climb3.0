@@ -128,6 +128,7 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navi
               title="Back to Login"
               onPress={handleBackToLogin}
               variant="text"
+              style={styles.textButton}
             />
           </View>
         </ScrollView>
@@ -178,6 +179,9 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 16,
     marginBottom: 8,
+  },
+  textButton: {
+    alignSelf: 'center',
   },
 });
 

@@ -125,6 +125,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               title="Forgot Password?"
               onPress={handleForgotPassword}
               variant="text"
+              style={styles.textButton}
             />
           </View>
 
@@ -174,6 +175,9 @@ const styles = StyleSheet.create({
   loginButton: {
     marginTop: 16,
     marginBottom: 8,
+  },
+  textButton: {
+    alignSelf: 'center',
   },
   footer: {
     flexDirection: 'row',

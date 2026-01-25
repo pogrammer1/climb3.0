@@ -64,18 +64,20 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({ navigation }) =>
   };
 
   const getOtherParticipant = (conversation: Conversation) => {
-    const participantsMap = (conversation as any).participants;
+    // Use participantsMap which keeps the original map structure with userId keys
+    const participantsMap = (conversation as any).participantsMap || (conversation as any).participants;
     if (typeof participantsMap === 'object' && !Array.isArray(participantsMap)) {
       const otherUserId = Object.keys(participantsMap).find((id) => id !== user?.uid);
       if (otherUserId) {
         return participantsMap[otherUserId];
       }
     }
-    return conversation.participants?.[0] || { displayName: 'Unknown', photoURL: null };
+    return { displayName: 'Unknown', photoURL: null };
   };
 
   const getUnreadCount = (conversation: Conversation) => {
-    const participantsMap = (conversation as any).participants;
+    // Use participantsMap which keeps the original map structure with userId keys
+    const participantsMap = (conversation as any).participantsMap || (conversation as any).participants;
     if (typeof participantsMap === 'object' && !Array.isArray(participantsMap) && user) {
       return participantsMap[user.uid]?.unreadCount || 0;
     }

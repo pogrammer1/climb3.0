@@ -66,7 +66,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
   const getOtherParticipant = () => {
     if (!currentConversation || !user) return { displayName: 'Chat', photoURL: null };
     
-    const participantsMap = (currentConversation as any).participants;
+    // Use participantsMap which keeps the original map structure with userId keys
+    const participantsMap = (currentConversation as any).participantsMap || (currentConversation as any).participants;
     if (typeof participantsMap === 'object' && !Array.isArray(participantsMap)) {
       const otherUserId = Object.keys(participantsMap).find((id) => id !== user.uid);
       if (otherUserId) {

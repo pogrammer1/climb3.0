@@ -1,5 +1,6 @@
 // Root Stack Navigator (Main app flow)
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from 'react-native-paper';
 import { MainTabNavigator } from './MainTabNavigator';
@@ -7,6 +8,7 @@ import { NewSessionScreen, SessionDetailScreen, EditSessionScreen } from '../scr
 import { ChatScreen } from '../screens/chat';
 import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen, AccountSettingsScreen, NotificationSettingsScreen, AchievementsScreen } from '../screens/profile';
 import { ConnectionScheduleScreen, MyScheduleScreen } from '../screens/schedule';
+import { OnboardingOverlay } from '../components/common';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -15,7 +17,8 @@ export const RootNavigator: React.FC = () => {
   const theme = useTheme();
 
   return (
-    <Stack.Navigator
+    <View style={styles.container}>
+      <Stack.Navigator
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
@@ -61,7 +64,17 @@ export const RootNavigator: React.FC = () => {
         component={AchievementsScreen as React.ComponentType<{}>}
       />
     </Stack.Navigator>
+    
+    {/* Onboarding overlay for first-time users */}
+    <OnboardingOverlay />
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
 
 export default RootNavigator;

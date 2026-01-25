@@ -13,3 +13,4 @@ export { NotificationProvider } from './NotificationProvider';
 export { NotificationBanner } from './NotificationBanner';
 export { Logo } from './Logo';
 export { AchievementBadge, AchievementBadgeList, AchievementCard } from './AchievementBadge';
+export { OnboardingOverlay } from './OnboardingOverlay';

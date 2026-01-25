@@ -52,10 +52,17 @@ export const MainTabNavigator: React.FC = () => {
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.outline,
+          borderTopColor: theme.colors.outlineVariant,
+          borderTopWidth: 1,
           paddingBottom: Platform.OS === 'ios' ? 20 : 8,
           paddingTop: 8,
           height: Platform.OS === 'ios' ? 85 : 65,
+          // Enhanced shadow for better visibility
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 16,
         },
         tabBarLabelStyle: {
           fontSize: 12,

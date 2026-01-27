@@ -10,9 +10,9 @@ A cross-platform (iOS, Android, Web) application for rock climbers to log sessio
 - **Location-based Discovery**: Find climbers in your area
 - **Scheduling System**: Schedule climbing days with connections
 - **Notification system**: Get emails for messages and connection requests
+- **Achievement system**: Achivements for certain mile stones 
 
 ## Upcoming Features
-- Achievement system
 - Mobile app (just browser right now on web/mobile)
 
 ## Tech Stack

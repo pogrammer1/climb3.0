@@ -20,7 +20,18 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) =
   const theme = useTheme();
   
   return (
-    <View style={[styles.featureCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline, borderWidth: 1 }]}>
+    <View
+      style={[
+        styles.featureCard,
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.primary,
+          borderWidth: 2,
+          borderStyle: 'solid',
+          shadowColor: theme.colors.primary,
+        },
+      ]}
+    >
       <View style={[styles.featureIconContainer, { backgroundColor: theme.colors.primaryContainer }]}>
         <MaterialCommunityIcons 
           name={icon} 
@@ -52,17 +63,17 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
     {
       icon: 'account-group' as const,
       title: 'Connect',
-      description: 'Discover other climbers in your area. Build a community and discover new friends who share your passion.',
+      description: 'Discover other climbers in your area and build a community with new friends who share your passion.',
     },
     {
       icon: 'chart-line' as const,
       title: 'Track',
-      description: 'Log your climbing sessions, track progress, and analyze stats over time. See how far you\'ve come on your climbing journey.',
+      description: 'Log your climbing sessions, track progress. See how far you can go.',
     },
     {
       icon: 'trophy' as const,
       title: 'Challenges',
-      description: 'Complete challenges and earn badges as you progress. Celebrate milestones and stay motivated with an achievement system.',
+      description: 'Celebrate milestones as you progress with an achievement system.',
     },
   ];
 
@@ -72,56 +83,62 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Section with Logo */}
-        <View style={styles.headerSection}>
-          <View style={[styles.logoContainer, isDesktop && styles.logoContainerDesktop]}>
-            <Image
-              source={require('../../../assets/icon.png')}
-              style={[styles.logo, isDesktop && styles.logoDesktop]}
-              resizeMode="contain"
-            />
-          </View>
-          
-          <Text 
-            variant="displayLarge" 
-            style={[
-              styles.title, 
-              { color: theme.colors.primary },
-              isDesktop && styles.titleDesktop
-            ]}
-          >
-            Belay
-          </Text>
-        </View>
-
-        {/* CTA Button */}
-        <View style={[styles.ctaContainer, isDesktop && styles.ctaContainerDesktop]}>
-          <Button
-            title="Climb on"
-            onPress={handleClimbOn}
-            fullWidth
-            style={isDesktop ? styles.ctaButtonDesktop : styles.ctaButton}
-          />
-        </View>
-
-        {/* Features Section */}
-        <View style={[styles.featuresSection, isDesktop && styles.featuresSectionDesktop]}>
-          <View style={[styles.featuresGrid, isDesktop && styles.featuresGridDesktop]}>
-            {features.map((feature, index) => (
-              <View 
-                key={index} 
-                style={[
-                  styles.featureCardWrapper,
-                  isDesktop && styles.featureCardWrapperDesktop
-                ]}
-              >
-                <FeatureCard
-                  icon={feature.icon}
-                  title={feature.title}
-                  description={feature.description}
+        {/* Main Content Wrapper */}
+        <View style={styles.mainContent}>
+          {/* Hero Section */}
+          <View style={styles.heroSection}>
+            {/* Header Section with Logo */}
+            <View style={styles.headerSection}>
+              <View style={[styles.logoContainer, isDesktop && styles.logoContainerDesktop]}>
+                <Image
+                  source={require('../../../assets/icon.png')}
+                  style={[styles.logo, isDesktop && styles.logoDesktop]}
+                  resizeMode="contain"
                 />
               </View>
-            ))}
+              
+              <Text 
+                variant="displayLarge" 
+                style={[
+                  styles.title, 
+                  { color: theme.colors.primary },
+                  isDesktop && styles.titleDesktop
+                ]}
+              >
+                Belay
+              </Text>
+            </View>
+
+            {/* CTA Button */}
+            <View style={[styles.ctaContainer, isDesktop && styles.ctaContainerDesktop]}>
+              <Button
+                title="Climb on"
+                onPress={handleClimbOn}
+                fullWidth
+                style={isDesktop ? styles.ctaButtonDesktop : styles.ctaButton}
+              />
+            </View>
+          </View>
+
+          {/* Features Section */}
+          <View style={[styles.featuresSection, isDesktop && styles.featuresSectionDesktop]}>
+            <View style={[styles.featuresGrid, isDesktop && styles.featuresGridDesktop]}>
+              {features.map((feature, index) => (
+                <View 
+                  key={index} 
+                  style={[
+                    styles.featureCardWrapper,
+                    isDesktop && styles.featureCardWrapperDesktop
+                  ]}
+                >
+                  <FeatureCard
+                    icon={feature.icon}
+                    title={feature.title}
+                    description={feature.description}
+                  />
+                </View>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -149,23 +166,29 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: 24,
-    paddingTop: 80,
     paddingBottom: 40,
+  },
+  mainContent: {
+    flex: 1,
     justifyContent: 'center',
-    minHeight: '100%',
+  },
+  heroSection: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 32,
   },
   headerSection: {
     alignItems: 'center',
     marginBottom: 32,
   },
   logoContainer: {
-    width: 120,
-    height: 120,
-    marginBottom: 16,
-  },
-  logoContainerDesktop: {
     width: 160,
     height: 160,
+    marginBottom: 48,
+  },
+  logoContainerDesktop: {
+    width: 200,
+    height: 200,
   },
   logo: {
     width: '100%',
@@ -185,14 +208,13 @@ const styles = StyleSheet.create({
     fontSize: 96,
   },
   ctaContainer: {
-    marginBottom: 48,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 120,
     alignSelf: 'center',
   },
   ctaContainerDesktop: {
-    maxWidth: 300,
+    maxWidth: 130,
     alignItems: 'center',
   },
   ctaButton: {
@@ -202,6 +224,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   featuresSection: {
+    marginTop: 8,
     marginBottom: 32,
   },
   featuresSectionDesktop: {
@@ -233,6 +256,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    minHeight: 220,
+    justifyContent: 'flex-start',
   },
   featureIconContainer: {
     width: 64,
@@ -246,10 +271,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center',
+    fontSize: 28,
   },
   featureDescription: {
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 26,
+    fontSize: 16,
   },
   footer: {
     flexDirection: 'row',

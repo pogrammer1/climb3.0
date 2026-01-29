@@ -1,10 +1,11 @@
 // Forgot Password Screen
 import React, { useState } from 'react';
-import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions, TouchableOpacity } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Input } from '../../components/common';
 import { resetPassword } from '../../services/authService';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface ForgotPasswordScreenProps {
   navigation: any;
@@ -82,6 +83,18 @@ export const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navi
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {/* Back Button */}
+      <TouchableOpacity 
+        style={styles.backButton} 
+        onPress={() => navigation.goBack()}
+      >
+        <MaterialCommunityIcons 
+          name="arrow-left" 
+          size={24} 
+          color={theme.colors.onBackground} 
+        />
+      </TouchableOpacity>
+      
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -218,6 +231,13 @@ const styles = StyleSheet.create({
   },
   textButton: {
     alignSelf: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    zIndex: 10,
+    padding: 8,
   },
 });
 

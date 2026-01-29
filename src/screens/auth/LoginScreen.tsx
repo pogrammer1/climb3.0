@@ -1,9 +1,9 @@
 // Login Screen
 import React, { useState } from 'react';
-import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input, Logo } from '../../components/common';
+import { Button, Input } from '../../components/common';
 import { signIn } from '../../services/authService';
 import { LoginFormData } from '../../types';
 
@@ -13,6 +13,9 @@ interface LoginScreenProps {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width > 768;
+  
   const [formData, setFormData] = useState<LoginFormData>({
     email: '',
     password: '',
@@ -76,68 +79,75 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <Logo size="large" />
-            <Text variant="titleMedium" style={[styles.subtitle, { color: theme.colors.onBackground }]}>
-              Welcome back, climber!
-            </Text>
-          </View>
+          <View style={[styles.formWrapper, isDesktop && styles.formWrapperDesktop]}>
+            <View style={styles.header}>
+              <Text 
+                variant="displayMedium" 
+                style={[styles.title, { color: theme.colors.primary }]}
+              >
+                Belay
+              </Text>
+              <Text variant="titleMedium" style={[styles.subtitle, { color: theme.colors.onBackground }]}>
+                Be the penguin 
+              </Text>
+            </View>
 
-          <View style={styles.form}>
-            {generalError && (
-              <View style={[styles.errorContainer, { backgroundColor: theme.colors.errorContainer }]}>
-                <Text style={{ color: theme.colors.onErrorContainer }}>{generalError}</Text>
-              </View>
-            )}
+            <View style={[styles.form, isDesktop && styles.formDesktop]}>
+              {generalError && (
+                <View style={[styles.errorContainer, { backgroundColor: theme.colors.errorContainer }]}>
+                  <Text style={{ color: theme.colors.onErrorContainer }}>{generalError}</Text>
+                </View>
+              )}
 
-            <Input
-              label="Email"
-              value={formData.email}
-              onChangeText={(text) => setFormData({ ...formData, email: text })}
-              keyboardType="email-address"
-              autoComplete="email"
-              autoCapitalize="none"
-              error={errors.email}
-              leftIcon="email-outline"
-              required
-            />
+              <Input
+                label="Email"
+                value={formData.email}
+                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                keyboardType="email-address"
+                autoComplete="email"
+                autoCapitalize="none"
+                error={errors.email}
+                leftIcon="email-outline"
+                required
+              />
 
-            <Input
-              label="Password"
-              value={formData.password}
-              onChangeText={(text) => setFormData({ ...formData, password: text })}
-              secureTextEntry
-              autoComplete="password"
-              error={errors.password}
-              leftIcon="lock-outline"
-              required
-            />
+              <Input
+                label="Password"
+                value={formData.password}
+                onChangeText={(text) => setFormData({ ...formData, password: text })}
+                secureTextEntry
+                autoComplete="password"
+                error={errors.password}
+                leftIcon="lock-outline"
+                required
+              />
 
-            <Button
-              title="Sign In"
-              onPress={handleLogin}
-              loading={isLoading}
-              fullWidth
-              style={styles.loginButton}
-            />
+              <Button
+                title="Sign In"
+                onPress={handleLogin}
+                loading={isLoading}
+                fullWidth
+                style={isDesktop ? styles.loginButtonDesktop : styles.loginButton}
+              />
 
-            <Button
-              title="Forgot Password?"
-              onPress={handleForgotPassword}
-              variant="text"
-              style={styles.textButton}
-            />
-          </View>
+              <Button
+                title="Forgot Password?"
+                onPress={handleForgotPassword}
+                variant="text"
+                style={styles.textButton}
+              />
+            </View>
 
-          <View style={styles.footer}>
-            <Text variant="bodyMedium" style={{ color: theme.colors.onBackground }}>
-              Don't have an account?
-            </Text>
-            <Button
-              title="Sign Up"
-              onPress={handleSignUp}
-              variant="text"
-            />
+            <View style={styles.footer}>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onBackground }}>
+                Don't have an account?
+              </Text>
+              <Button
+                title="Sign Up"
+                onPress={handleSignUp}
+                variant="text"
+              />
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -156,16 +166,29 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+    alignItems: 'center',
+  },
+  formWrapper: {
+    width: '100%',
+  },
+  formWrapperDesktop: {
+    maxWidth: 400,
   },
   header: {
     alignItems: 'center',
     marginBottom: 40,
+  },
+  title: {
+    fontWeight: 'bold',
   },
   subtitle: {
     marginTop: 12,
   },
   form: {
     marginBottom: 24,
+  },
+  formDesktop: {
+    // Smaller inputs on desktop handled by wrapper maxWidth
   },
   errorContainer: {
     padding: 12,
@@ -175,6 +198,12 @@ const styles = StyleSheet.create({
   loginButton: {
     marginTop: 16,
     marginBottom: 8,
+  },
+  loginButtonDesktop: {
+    marginTop: 16,
+    marginBottom: 8,
+    alignSelf: 'center',
+    minWidth: 200,
   },
   textButton: {
     alignSelf: 'center',

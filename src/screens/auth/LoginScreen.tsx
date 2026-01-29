@@ -82,7 +82,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           <View style={[styles.formWrapper, isDesktop && styles.formWrapperDesktop]}>
             <View style={styles.header}>
               <Text 
-                variant="displayMedium" 
+                variant="displayLarge" 
                 style={[styles.title, { color: theme.colors.primary }]}
               >
                 Belay
@@ -146,6 +146,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
                 title="Sign Up"
                 onPress={handleSignUp}
                 variant="text"
+                size="small"
               />
             </View>
           </View>
@@ -212,6 +213,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
 });
 

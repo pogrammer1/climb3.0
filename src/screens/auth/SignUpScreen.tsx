@@ -1,9 +1,9 @@
 // Sign Up Screen
 import React, { useState } from 'react';
-import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input, Logo } from '../../components/common';
+import { Button, Input } from '../../components/common';
 import { signUp } from '../../services/authService';
 import { saveProfile } from '../../services/profileService';
 import { SignupFormData } from '../../types';
@@ -14,6 +14,9 @@ interface SignUpScreenProps {
 
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width > 768;
+  
   const [formData, setFormData] = useState<SignupFormData>({
     email: '',
     password: '',
@@ -106,83 +109,91 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <Logo size="medium" />
-            <Text variant="titleMedium" style={[styles.subtitle, { color: theme.colors.onBackground }]}>
-              Join the climbing community!
-            </Text>
-          </View>
+          <View style={[styles.formWrapper, isDesktop && styles.formWrapperDesktop]}>
+            <View style={styles.header}>
+              <Text 
+                variant="displayLarge" 
+                style={[styles.title, { color: theme.colors.primary }]}
+              >
+                Belay
+              </Text>
+              <Text variant="titleMedium" style={[styles.subtitle, { color: theme.colors.onBackground }]}>
+                Join the climbing community!
+              </Text>
+            </View>
 
-          <View style={styles.form}>
-            {generalError && (
-              <View style={[styles.errorContainer, { backgroundColor: theme.colors.errorContainer }]}>
-                <Text style={{ color: theme.colors.onErrorContainer }}>{generalError}</Text>
-              </View>
-            )}
+            <View style={styles.form}>
+              {generalError && (
+                <View style={[styles.errorContainer, { backgroundColor: theme.colors.errorContainer }]}>
+                  <Text style={{ color: theme.colors.onErrorContainer }}>{generalError}</Text>
+                </View>
+              )}
 
-            <Input
-              label="Display Name"
-              value={formData.displayName}
-              onChangeText={(text) => setFormData({ ...formData, displayName: text })}
-              autoCapitalize="words"
-              autoComplete="name"
-              error={errors.displayName}
-              leftIcon="account-outline"
-              required
-            />
+              <Input
+                label="Display Name"
+                value={formData.displayName}
+                onChangeText={(text) => setFormData({ ...formData, displayName: text })}
+                autoCapitalize="words"
+                autoComplete="name"
+                error={errors.displayName}
+                leftIcon="account-outline"
+                required
+              />
 
-            <Input
-              label="Email"
-              value={formData.email}
-              onChangeText={(text) => setFormData({ ...formData, email: text })}
-              keyboardType="email-address"
-              autoComplete="email"
-              autoCapitalize="none"
-              error={errors.email}
-              leftIcon="email-outline"
-              required
-            />
+              <Input
+                label="Email"
+                value={formData.email}
+                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                keyboardType="email-address"
+                autoComplete="email"
+                autoCapitalize="none"
+                error={errors.email}
+                leftIcon="email-outline"
+                required
+              />
 
-            <Input
-              label="Password"
-              value={formData.password}
-              onChangeText={(text) => setFormData({ ...formData, password: text })}
-              secureTextEntry
-              autoComplete="password"
-              error={errors.password}
-              leftIcon="lock-outline"
-              helperText="At least 6 characters"
-              required
-            />
+              <Input
+                label="Password"
+                value={formData.password}
+                onChangeText={(text) => setFormData({ ...formData, password: text })}
+                secureTextEntry
+                autoComplete="password"
+                error={errors.password}
+                leftIcon="lock-outline"
+                helperText="At least 6 characters"
+                required
+              />
 
-            <Input
-              label="Confirm Password"
-              value={formData.confirmPassword}
-              onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
-              secureTextEntry
-              error={errors.confirmPassword}
-              leftIcon="lock-check-outline"
-              required
-            />
+              <Input
+                label="Confirm Password"
+                value={formData.confirmPassword}
+                onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
+                secureTextEntry
+                error={errors.confirmPassword}
+                leftIcon="lock-check-outline"
+                required
+              />
 
-            <Button
-              title="Create Account"
-              onPress={handleSignUp}
-              loading={isLoading}
-              fullWidth
-              style={styles.signUpButton}
-            />
-          </View>
+              <Button
+                title="Create Account"
+                onPress={handleSignUp}
+                loading={isLoading}
+                fullWidth
+                style={isDesktop ? styles.signUpButtonDesktop : styles.signUpButton}
+              />
+            </View>
 
-          <View style={styles.footer}>
-            <Text variant="bodyMedium" style={{ color: theme.colors.onBackground }}>
-              Already have an account?
-            </Text>
-            <Button
-              title="Sign In"
-              onPress={handleSignIn}
-              variant="text"
-            />
+            <View style={styles.footer}>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onBackground }}>
+                Already have an account?
+              </Text>
+              <Button
+                title="Sign In"
+                onPress={handleSignIn}
+                variant="text"
+                size="small"
+              />
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -201,10 +212,20 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+    alignItems: 'center',
+  },
+  formWrapper: {
+    width: '100%',
+  },
+  formWrapperDesktop: {
+    maxWidth: 400,
   },
   header: {
     alignItems: 'center',
     marginBottom: 32,
+  },
+  title: {
+    fontWeight: 'bold',
   },
   subtitle: {
     marginTop: 12,
@@ -220,10 +241,16 @@ const styles = StyleSheet.create({
   signUpButton: {
     marginTop: 16,
   },
+  signUpButtonDesktop: {
+    marginTop: 16,
+    alignSelf: 'center',
+    minWidth: 200,
+  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
 });
 

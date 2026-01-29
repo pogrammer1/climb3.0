@@ -20,7 +20,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) =
   const theme = useTheme();
   
   return (
-    <View style={[styles.featureCard, { backgroundColor: theme.colors.surface }]}>
+    <View style={[styles.featureCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.outline, borderWidth: 1 }]}>
       <View style={[styles.featureIconContainer, { backgroundColor: theme.colors.primaryContainer }]}>
         <MaterialCommunityIcons 
           name={icon} 
@@ -28,10 +28,10 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) =
           color={theme.colors.primary} 
         />
       </View>
-      <Text variant="titleMedium" style={[styles.featureTitle, { color: theme.colors.onSurface }]}>
+      <Text variant="titleMedium" style={[styles.featureTitle, { color: theme.colors.onSurface, fontWeight: 'bold' }]}>
         {title}
       </Text>
-      <Text variant="bodyMedium" style={[styles.featureDescription, { color: theme.colors.onSurfaceVariant }]}>
+      <Text variant="bodyMedium" style={[styles.featureDescription, { color: theme.colors.onSurface }]}>
         {description}
       </Text>
     </View>
@@ -51,18 +51,18 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
   const features = [
     {
       icon: 'account-group' as const,
-      title: 'Connect with Climbers',
-      description: 'Find and connect with climbing partners in your area. Build your climbing community and discover new friends who share your passion.',
+      title: 'Connect',
+      description: 'Discover other climbers in your area. Build a community and discover new friends who share your passion.',
     },
     {
       icon: 'chart-line' as const,
-      title: 'Track Your Sessions',
-      description: 'Log your climbing sessions, track your progress, and analyze your stats over time. See how far you\'ve come on your climbing journey.',
+      title: 'Track',
+      description: 'Log your climbing sessions, track progress, and analyze stats over time. See how far you\'ve come on your climbing journey.',
     },
     {
       icon: 'trophy' as const,
-      title: 'Earn Achievements',
-      description: 'Complete challenges and earn badges as you progress. Celebrate milestones and stay motivated with our achievement system.',
+      title: 'Challenges',
+      description: 'Complete challenges and earn badges as you progress. Celebrate milestones and stay motivated with an achievement system.',
     },
   ];
 
@@ -92,13 +92,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
           >
             Belay
           </Text>
-          
-          <Text 
-            variant="titleMedium" 
-            style={[styles.tagline, { color: theme.colors.onSurfaceVariant }]}
-          >
-            Your climbing companion
-          </Text>
         </View>
 
         {/* CTA Button */}
@@ -106,20 +99,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
           <Button
             title="Climb on"
             onPress={handleClimbOn}
-            fullWidth={!isDesktop}
+            fullWidth
             style={isDesktop ? styles.ctaButtonDesktop : styles.ctaButton}
           />
         </View>
 
         {/* Features Section */}
         <View style={[styles.featuresSection, isDesktop && styles.featuresSectionDesktop]}>
-          <Text 
-            variant="titleLarge" 
-            style={[styles.featuresTitle, { color: theme.colors.onBackground }]}
-          >
-            Why Belay?
-          </Text>
-          
           <View style={[styles.featuresGrid, isDesktop && styles.featuresGridDesktop]}>
             {features.map((feature, index) => (
               <View 
@@ -142,13 +128,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
         {/* Footer */}
         <View style={styles.footer}>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            Already have an account?{' '}
+            Already have an account?
           </Text>
           <Button
             title="Sign In"
             onPress={handleClimbOn}
             variant="text"
-            style={styles.signInLink}
+            size="small"
           />
         </View>
       </ScrollView>
@@ -163,7 +149,10 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: 24,
-    paddingTop: 40,
+    paddingTop: 80,
+    paddingBottom: 40,
+    justifyContent: 'center',
+    minHeight: '100%',
   },
   headerSection: {
     alignItems: 'center',
@@ -188,29 +177,29 @@ const styles = StyleSheet.create({
   },
   title: {
     fontWeight: 'bold',
-    fontSize: 48,
-    marginBottom: 8,
+    fontSize: 72,
+    marginBottom: 16,
+    letterSpacing: 2,
   },
   titleDesktop: {
-    fontSize: 64,
-  },
-  tagline: {
-    textAlign: 'center',
+    fontSize: 96,
   },
   ctaContainer: {
     marginBottom: 48,
     alignItems: 'center',
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
   },
   ctaContainerDesktop: {
+    maxWidth: 300,
     alignItems: 'center',
   },
   ctaButton: {
-    paddingVertical: 8,
+    marginTop: 8,
   },
   ctaButtonDesktop: {
-    minWidth: 200,
-    paddingHorizontal: 48,
-    paddingVertical: 8,
+    marginTop: 8,
   },
   featuresSection: {
     marginBottom: 32,
@@ -219,11 +208,6 @@ const styles = StyleSheet.create({
     maxWidth: 1000,
     alignSelf: 'center',
     width: '100%',
-  },
-  featuresTitle: {
-    textAlign: 'center',
-    marginBottom: 24,
-    fontWeight: '600',
   },
   featuresGrid: {
     gap: 16,
@@ -273,9 +257,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 'auto',
     paddingTop: 16,
-  },
-  signInLink: {
-    marginLeft: -8,
+    gap: 4,
   },
 });
 

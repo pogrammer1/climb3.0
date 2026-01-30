@@ -718,26 +718,51 @@ export const onNewMessageAgg = onDocumentCreated(
 
 /**
  * Profile write: update derived public stats (createdAt, highest grades, years)
+ * 
+ * IMPORTANT: This function only runs when relevant profile fields change,
+ * NOT when publicStats changes. This prevents infinite loops.
  */
 export const onProfileWriteAgg = onDocumentUpdated(
   "profiles/{userId}",
   async (event: FirestoreEvent<Change<QueryDocumentSnapshot> | undefined, { userId: string }>) => {
     if (!event.data) return;
+    const before = event.data.before?.data();
     const after = event.data.after?.data();
     if (!after) return;
     const userId = event.params.userId;
 
-    // createdAt -> store if present
-    if (after.createdAt) {
+    // CRITICAL: Check if only publicStats changed - if so, skip to prevent infinite loop
+    const beforeWithoutStats = { ...before };
+    const afterWithoutStats = { ...after };
+    delete beforeWithoutStats?.publicStats;
+    delete afterWithoutStats?.publicStats;
+    
+    // If no relevant fields changed (only publicStats), skip
+    const relevantFieldsChanged = 
+      before?.createdAt !== after.createdAt ||
+      before?.yearsClimbing !== after.yearsClimbing ||
+      before?.highestGradeBouldering !== after.highestGradeBouldering ||
+      before?.highestGradeYDS !== after.highestGradeYDS;
+    
+    if (!relevantFieldsChanged) {
+      logger.info(`Skipping onProfileWriteAgg for ${userId} - no relevant fields changed`);
+      return;
+    }
+
+    logger.info(`Processing profile update for ${userId}`);
+
+    // createdAt -> store if present and changed
+    if (after.createdAt && before?.createdAt !== after.createdAt) {
       await incrementPublicStats(userId, { createdAt: after.createdAt });
     }
 
-    // yearsClimbing, highestGradeBouldering, highestGradeYDS
-    if (after.yearsClimbing !== undefined) {
+    // yearsClimbing - only if changed
+    if (after.yearsClimbing !== undefined && before?.yearsClimbing !== after.yearsClimbing) {
       await incrementPublicStats(userId, { yearsClimbing: after.yearsClimbing });
     }
 
-    if (after.highestGradeBouldering) {
+    // highestGradeBouldering - only if changed
+    if (after.highestGradeBouldering && before?.highestGradeBouldering !== after.highestGradeBouldering) {
       const vGradeStr = after.highestGradeBouldering;
       if (typeof vGradeStr === "string" && vGradeStr.startsWith("V") && vGradeStr !== "VB") {
         const num = parseInt(vGradeStr.substring(1)) || 0;
@@ -745,7 +770,8 @@ export const onProfileWriteAgg = onDocumentUpdated(
       }
     }
 
-    if (after.highestGradeYDS) {
+    // highestGradeYDS - only if changed
+    if (after.highestGradeYDS && before?.highestGradeYDS !== after.highestGradeYDS) {
       await incrementPublicStats(userId, { highestYDSGrade: after.highestGradeYDS });
     }
   }

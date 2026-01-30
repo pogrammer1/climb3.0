@@ -96,7 +96,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
                   resizeMode="contain"
                 />
               </View>
-              
               <Text 
                 variant="displayLarge" 
                 style={[
@@ -107,16 +106,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
               >
                 Belay
               </Text>
-            </View>
-
-            {/* CTA Button */}
-            <View style={[styles.ctaContainer, isDesktop && styles.ctaContainerDesktop]}>
-              <Button
-                title="Climb on"
-                onPress={handleClimbOn}
-                fullWidth
-                style={isDesktop ? styles.ctaButtonDesktop : styles.ctaButton}
-              />
             </View>
           </View>
 
@@ -139,6 +128,16 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
                 </View>
               ))}
             </View>
+          </View>
+
+          {/* CTA Button */}
+          <View style={[styles.ctaContainer, isDesktop && styles.ctaContainerDesktop]}>
+            <Button
+              title="Climb on"
+              onPress={handleClimbOn}
+              fullWidth
+              style={isDesktop ? styles.ctaButtonDesktop : styles.ctaButton}
+            />
           </View>
         </View>
 
@@ -175,16 +174,16 @@ const styles = StyleSheet.create({
   heroSection: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 32,
+    paddingBottom: 8,
   },
   headerSection: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
   },
   logoContainer: {
     width: 160,
     height: 160,
-    marginBottom: 48,
+    marginBottom: 24,
   },
   logoContainerDesktop: {
     width: 200,
@@ -224,7 +223,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   featuresSection: {
-    marginTop: 8,
+    marginTop: 0,
     marginBottom: 32,
   },
   featuresSectionDesktop: {

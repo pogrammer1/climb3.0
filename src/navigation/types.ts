@@ -24,6 +24,7 @@ export type RootStackParamList = {
   NewSession: undefined;
   SessionDetail: { sessionId: string };
   EditSession: { sessionId: string };
+  SessionsMap: undefined;
   Chat: { conversationId: string };
   EditProfile: undefined;
   MatchProfile: { matchId: string };

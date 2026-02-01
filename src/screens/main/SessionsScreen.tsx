@@ -1,7 +1,7 @@
 // Sessions List Screen
 import React, { useEffect, useCallback } from 'react';
 import { StyleSheet, View, FlatList } from 'react-native';
-import { Text, useTheme, FAB, Searchbar } from 'react-native-paper';
+import { Text, useTheme, FAB, Searchbar, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -133,9 +133,16 @@ export const SessionsScreen: React.FC<SessionsScreenProps> = ({ navigation }) =>
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
-        <Text variant="headlineMedium" style={{ color: theme.colors.onBackground }}>
+        <Text variant="headlineMedium" style={{ color: theme.colors.onBackground, flex: 1 }}>
           My Sessions
         </Text>
+        <IconButton
+          icon="map-marker-multiple"
+          iconColor={theme.colors.primary}
+          size={24}
+          onPress={() => navigation.navigate('SessionsMap')}
+          style={styles.mapButton}
+        />
       </View>
 
       <Searchbar
@@ -184,8 +191,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     paddingBottom: 8,
+  },
+  mapButton: {
+    margin: 0,
   },
   searchBar: {
     marginHorizontal: 16,

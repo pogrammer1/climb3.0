@@ -4,10 +4,11 @@ import { StyleSheet, View, ScrollView, Pressable, TextInput, Platform } from 're
 import { Text, useTheme, Portal, Modal, Searchbar, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { searchGyms, saveGymToDatabase, Gym } from '../../services/gymService';
+import { searchGyms, saveGymToDatabase, getPlaceDetails, Gym } from '../../services/gymService';
 import { useAuthStore } from '../../store';
 
 // Fallback gyms when database is empty or offline
+// might not need this
 const FALLBACK_GYMS: Gym[] = [
   // Northeast US
   { id: '1', name: 'Brooklyn Boulders Queensbridge', address: '', city: 'Queens', state: 'NY', country: 'USA', type: 'indoor', category: 'gym', chain: 'Brooklyn Boulders', verified: true, sessionCount: 0, createdAt: new Date(), updatedAt: new Date() },
@@ -127,13 +128,40 @@ export const GymPicker: React.FC<GymPickerProps> = ({
   };
 
   const handleSelect = async (gym: Gym) => {
-    // If it's a Google Places result (not yet in our DB), save it
-    if (gym.id.startsWith('google_') && user) {
-      const savedGym = await saveGymToDatabase(gym, user.uid);
-      if (savedGym) {
-        onSelect(savedGym.name, savedGym.id);
-      } else {
+    // If it's a Google Places result (not yet in our DB), fetch details and save it
+    if (gym.id.startsWith('google_') && gym.placeId && user) {
+      setIsLoading(true);
+      try {
+        const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+        let gymWithDetails = { ...gym };
+        
+        // Fetch place details to get coordinates and full address info
+        if (apiKey) {
+          const details = await getPlaceDetails(gym.placeId, apiKey);
+          if (details) {
+            gymWithDetails = {
+              ...gym,
+              name: details.name || gym.name,
+              address: details.address || gym.address,
+              city: details.city || gym.city,
+              state: details.state || gym.state,
+              country: details.country || gym.country,
+              location: details.location || gym.location,
+            };
+          }
+        }
+        
+        const savedGym = await saveGymToDatabase(gymWithDetails, user.uid);
+        if (savedGym) {
+          onSelect(savedGym.name, savedGym.id);
+        } else {
+          onSelect(gymWithDetails.name, gym.id);
+        }
+      } catch (error) {
+        console.error('Error fetching place details:', error);
         onSelect(gym.name, gym.id);
+      } finally {
+        setIsLoading(false);
       }
     } else {
       onSelect(gym.name, gym.id);
@@ -144,22 +172,47 @@ export const GymPicker: React.FC<GymPickerProps> = ({
 
   const handleCustomSubmit = async () => {
     if (customLocation.trim() && user) {
-      // Save custom location to database
+      // Parse custom location for city/state if user includes them
+      // Supports formats like: "Mesa Rim, Austin, TX" or "Mesa Rim, Austin TX" or "Mesa Rim Austin TX"
+      const locationText = customLocation.trim();
+      let gymName = locationText;
+      let city = '';
+      let state = '';
+      
+      // Try to parse "Name, City, State" or "Name, City State" format
+      const parts = locationText.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        gymName = parts[0];
+        // Last part might be "City, State" or "City State"
+        const lastPart = parts.slice(1).join(', ').trim();
+        const stateMatch = lastPart.match(/^(.+?)[,\s]+([A-Z]{2})$/i);
+        if (stateMatch) {
+          city = stateMatch[1].trim();
+          state = stateMatch[2].toUpperCase();
+        } else if (parts.length === 3) {
+          city = parts[1];
+          state = parts[2].toUpperCase();
+        } else {
+          city = lastPart;
+        }
+      }
+      
+      // Save custom location to database with parsed city/state
       const customGym: Partial<Gym> = {
-        name: customLocation.trim(),
+        name: gymName,
         type: locationType,
         category: locationType === 'indoor' ? 'gym' : 'crag',
-        city: '',
+        city: city,
         address: '',
-        state: '',
-        country: '',
+        state: state,
+        country: state ? 'USA' : '',
       };
       
       const savedGym = await saveGymToDatabase(customGym, user.uid);
       if (savedGym) {
         onSelect(savedGym.name, savedGym.id);
       } else {
-        onSelect(customLocation.trim());
+        onSelect(gymName);
       }
       
       setVisible(false);
@@ -258,7 +311,7 @@ export const GymPicker: React.FC<GymPickerProps> = ({
           {/* Custom location input */}
           <View style={styles.customInputContainer}>
             <TextInput
-              placeholder="Or enter custom location..."
+              placeholder="Or enter: Gym Name, City, ST"
               placeholderTextColor={theme.colors.onSurfaceVariant}
               value={customLocation}
               onChangeText={setCustomLocation}

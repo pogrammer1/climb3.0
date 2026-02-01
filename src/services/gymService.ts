@@ -575,6 +575,31 @@ export const saveGymToDatabase = async (
 };
 
 /**
+ * Update a gym with new coordinates (used to fix gyms missing location data)
+ */
+export const updateGymCoordinates = async (
+  gymId: string,
+  location: { latitude: number; longitude: number },
+  city?: string,
+  state?: string
+): Promise<void> => {
+  try {
+    const gymRef = doc(db, GYMS_COLLECTION, gymId);
+    const updateData: Record<string, any> = {
+      location,
+      updatedAt: serverTimestamp(),
+    };
+    if (city) updateData.city = city;
+    if (state) updateData.state = state;
+    
+    await setDoc(gymRef, updateData, { merge: true });
+    console.log('Updated gym coordinates:', gymId, location);
+  } catch (error) {
+    console.error('Error updating gym coordinates:', error);
+  }
+};
+
+/**
  * Get gym by Google Place ID
  */
 export const getGymByPlaceId = async (placeId: string): Promise<Gym | null> => {

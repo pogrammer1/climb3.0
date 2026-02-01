@@ -883,3 +883,52 @@ function visibleUserId(uid: string): string {
   return uid;
 }
 
+/**
+ * Geocoding Cloud Function - Converts location names to coordinates
+ * Using OpenStreetMap Nominatim API (server-side to avoid CORS)
+ */
+export const geocodeLocation = onRequest(
+  { cors: true }, // Enable CORS for browser requests
+  async (req, res) => {
+    const locationName = req.query.q as string || req.body?.q;
+    
+    if (!locationName) {
+      res.status(400).json({ error: "Missing 'q' parameter (location name)" });
+      return;
+    }
+
+    try {
+      // Use node-fetch or built-in fetch for server-side request
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}&limit=1`,
+        {
+          headers: {
+            "User-Agent": "BelayClimbingApp/1.0 (contact@belay-app.com)",
+            "Accept": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        logger.error(`Nominatim API error: ${response.status}`);
+        res.status(502).json({ error: "Geocoding service unavailable" });
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        res.json({
+          latitude: parseFloat(data[0].lat),
+          longitude: parseFloat(data[0].lon),
+          displayName: data[0].display_name,
+        });
+      } else {
+        res.json({ latitude: null, longitude: null });
+      }
+    } catch (error) {
+      logger.error("Geocoding error:", error);
+      res.status(500).json({ error: "Geocoding failed" });
+    }
+  }
+);

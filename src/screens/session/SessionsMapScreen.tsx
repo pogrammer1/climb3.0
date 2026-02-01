@@ -5,7 +5,7 @@ import { Text, useTheme, IconButton, Card, Chip, ActivityIndicator } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore, useSessionStore } from '../../store';
-import { getVisitedLocations, VisitedLocation, clearGeocodeCache, updateGymCoordinates } from '../../services/locationMapService';
+import { getVisitedLocations, VisitedLocation, clearGeocodeCache } from '../../services/locationMapService';
 import { format } from 'date-fns';
 
 // Import WebMapView only on web platform

@@ -41,26 +41,6 @@ export const clearGeocodeCache = () => {
 };
 
 /**
- * Update gym coordinates directly in Firestore
- */
-export const updateGymCoordinates = async (
-  gymId: string,
-  latitude: number,
-  longitude: number
-): Promise<void> => {
-  try {
-    const gymRef = doc(db, 'gyms', gymId);
-    await setDoc(gymRef, {
-      location: { latitude, longitude },
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
-    console.log(`Updated gym ${gymId} coordinates to ${latitude}, ${longitude}`);
-  } catch (error) {
-    console.error('Error updating gym coordinates:', error);
-  }
-};
-
-/**
  * Geocode a location name to coordinates using our Cloud Function
  * The Cloud Function calls OpenStreetMap Nominatim server-side (no CORS)
  */

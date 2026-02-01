@@ -2,10 +2,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VisitedLocation } from '../../services/locationMapService';
 
-// Import Leaflet from CDN via script tag (more reliable than bundled version)
-declare global {
-  var L: any;
-}
+// Leaflet type declaration for CDN-loaded library
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LeafletType = any;
 
 interface WebMapViewProps {
   locations: VisitedLocation[];

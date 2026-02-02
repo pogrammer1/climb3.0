@@ -286,71 +286,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        {/* Pending Requests Section - Always visible */}
-        <View style={styles.section}>
-          <Pressable 
-            style={styles.sectionHeader}
-            onPress={() => navigation.navigate('MatchRequests')}
-          >
-            <View style={styles.sectionTitleRow}>
-              <MaterialCommunityIcons name="account-clock" size={22} color={theme.colors.primary} />
-              <Text variant="titleMedium" style={{ color: theme.colors.onBackground, marginLeft: 8 }}>
-                Pending Requests
-              </Text>
-              {pendingRequests.length > 0 && (
-                <Badge style={{ marginLeft: 8, backgroundColor: theme.colors.error }}>
-                  {pendingRequests.length}
-                </Badge>
-              )}
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
-          </Pressable>
-          
-          {pendingWithProfiles.length === 0 ? (
-            <Pressable 
-              style={[styles.emptySection, { backgroundColor: theme.colors.surfaceVariant }]}
-              onPress={() => navigation.navigate('MatchRequests')}
-            >
-              <MaterialCommunityIcons name="account-clock-outline" size={32} color={theme.colors.onSurfaceVariant} />
-              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: 'center' }}>
-                No pending requests
-              </Text>
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
-                When someone wants to connect, they'll appear here
-              </Text>
-            </Pressable>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-              {pendingWithProfiles.map((item) => (
-                <Pressable 
-                  key={item.id} 
-                  style={[styles.pendingCard, { backgroundColor: theme.colors.surfaceVariant }]}
-                  onPress={() => navigation.navigate('MatchRequests')}
-                >
-                  <Avatar
-                    source={item.profile?.photoURL}
-                    name={item.profile?.displayName || 'Unknown'}
-                    size={56}
-                  />
-                  <Text 
-                    variant="labelMedium" 
-                    style={{ color: theme.colors.onSurface, marginTop: 8, textAlign: 'center', width: 80 }}
-                    numberOfLines={1}
-                  >
-                    {item.profile?.displayName || 'Unknown'}
-                  </Text>
-                  <Text variant="labelSmall" style={{ color: theme.colors.primary, marginTop: 4 }}>
-                    Respond
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-
-        <Divider style={styles.divider} />
-
-        {/* Connected Users Section - Always visible */}
+        {/* My Connections Section - Now at top */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
@@ -426,7 +362,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
 
         <Divider style={styles.divider} />
 
-        {/* Find New Climbers Section */}
+        {/* Find New Climbers Section - Now in middle with Pending Requests button */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
@@ -435,11 +371,27 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
                 Find New Climbers
               </Text>
             </View>
-            {activeFiltersCount > 0 && (
-              <Chip compact onClose={handleClearFilters}>
-                {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
-              </Chip>
-            )}
+            <View style={styles.sectionHeaderButtons}>
+              {activeFiltersCount > 0 && (
+                <Chip compact onClose={handleClearFilters} style={{ marginRight: 8 }}>
+                  {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
+                </Chip>
+              )}
+              <Pressable 
+                style={[styles.pendingRequestsButton, { backgroundColor: theme.colors.primaryContainer }]}
+                onPress={() => navigation.navigate('MatchRequests')}
+              >
+                <MaterialCommunityIcons name="account-clock" size={18} color={theme.colors.primary} />
+                <Text variant="labelMedium" style={{ color: theme.colors.primary, marginLeft: 6, fontWeight: '600' }}>
+                  Requests
+                </Text>
+                {pendingRequests.length > 0 && (
+                  <Badge size={18} style={{ marginLeft: 6, backgroundColor: theme.colors.error }}>
+                    {pendingRequests.length}
+                  </Badge>
+                )}
+              </Pressable>
+            </View>
           </View>
 
           {newClimbers.length === 0 ? (
@@ -562,6 +514,22 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   scheduleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  sectionHeaderButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pendingRequestsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,

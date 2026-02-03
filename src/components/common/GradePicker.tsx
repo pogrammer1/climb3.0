@@ -46,11 +46,7 @@ export const GradePicker: React.FC<GradePickerProps> = ({
         />
       )}
       
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.gradesContainer}
-      >
+      <View style={styles.gradesContainer}>
         {grades.map((grade) => (
           <Chip
             key={grade}
@@ -66,7 +62,7 @@ export const GradePicker: React.FC<GradePickerProps> = ({
             {grade}
           </Chip>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -83,10 +79,12 @@ const styles = StyleSheet.create({
   },
   gradesContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingVertical: 4,
   },
   gradeChip: {
     marginRight: 8,
+    marginBottom: 8,
   },
 });
 

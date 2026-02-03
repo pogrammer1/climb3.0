@@ -1,14 +1,13 @@
 // New Session Screen - Create a climbing session with inline climb logging
 import React, { useState } from 'react';
 import { StyleSheet, View, ScrollView, Platform, Pressable } from 'react-native';
-import { Text, useTheme, SegmentedButtons, IconButton, Chip, Divider, Portal, Modal } from 'react-native-paper';
+import { Text, useTheme, SegmentedButtons, IconButton, Chip, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Button, Input, Card, GradePicker, GymPicker } from '../../components/common';
+import { Button, Input, Card, GymPicker, AddClimbModal, ClimbFormData as AddClimbFormData } from '../../components/common';
 import { useAuthStore, useSessionStore } from '../../store';
 import { SessionFormData, ClimbFormData, ClimbingType, AttemptResult } from '../../types';
 import { showAlert } from '../../utils/alert';
-import { CLIMBING_TYPES, ATTEMPT_RESULTS } from '../../constants';
 
 // Web-compatible DateTimePicker component
 const DateTimePicker = ({ value, mode, onChange, maximumDate }: any) => {
@@ -78,17 +77,6 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
   const [climbs, setClimbs] = useState<TempClimb[]>([]);
   const [showClimbModal, setShowClimbModal] = useState(false);
   const [editingClimbIndex, setEditingClimbIndex] = useState<number | null>(null);
-  const [gradeSystem, setGradeSystem] = useState<'yds' | 'v-scale'>('v-scale');
-  const [newClimb, setNewClimb] = useState<Partial<TempClimb>>({
-    name: '',
-    climbingType: 'Bouldering',
-    grade: 'V0',
-    gradeSystem: 'v-scale',
-    attempts: '1',
-    result: 'Send',
-    notes: '',
-    rating: 3,
-  });
   const [saving, setSaving] = useState(false);
 
   const validateForm = (): boolean => {
@@ -166,44 +154,18 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
 
   const handleAddClimb = () => {
     setEditingClimbIndex(null);
-    setNewClimb({
-      name: '',
-      climbingType: 'Bouldering',
-      grade: 'V0',
-      gradeSystem: 'v-scale',
-      attempts: '1',
-      result: 'Send',
-      notes: '',
-      rating: 3,
-    });
-    setGradeSystem('v-scale');
     setShowClimbModal(true);
   };
 
   const handleEditClimb = (index: number) => {
-    const climb = climbs[index];
     setEditingClimbIndex(index);
-    setNewClimb(climb);
-    setGradeSystem(climb.gradeSystem);
     setShowClimbModal(true);
   };
 
-  const handleSaveClimb = () => {
-    if (!newClimb.grade) {
-      showAlert('Error', 'Please select a grade');
-      return;
-    }
-
+  const handleSaveClimb = (climbData: AddClimbFormData) => {
     const climbToSave: TempClimb = {
       id: editingClimbIndex !== null ? climbs[editingClimbIndex].id : Date.now().toString(),
-      name: newClimb.name || '',
-      climbingType: newClimb.climbingType || 'Bouldering',
-      grade: newClimb.grade || 'V0',
-      gradeSystem: newClimb.gradeSystem || 'v-scale',
-      attempts: newClimb.attempts || '1',
-      result: newClimb.result || 'Send',
-      notes: newClimb.notes || '',
-      rating: newClimb.rating || 3,
+      ...climbData,
     };
 
     if (editingClimbIndex !== null) {
@@ -221,6 +183,7 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
     setClimbs(climbs.filter((_, i) => i !== index));
   };
 
+  // Get color based on attempt result, add diff color for fail other than gray later maybe or change system all together
   const getResultColor = (result: AttemptResult): string => {
     const successResults = ['Send', 'Flash', 'Onsight', 'Redpoint'];
     return successResults.includes(result) ? theme.colors.primary : theme.colors.outline;
@@ -248,18 +211,22 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
             Date
           </Text>
           {showDatePicker || Platform.OS === 'web' ? (
-            <DateTimePicker
-              value={formData.date}
-              mode="date"
-              onChange={handleDateChange}
-              maximumDate={new Date()}
-            />
+            <View style={styles.dateRow}>
+              <DateTimePicker
+                value={formData.date}
+                mode="date"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+              />
+            </View>
           ) : (
             <Pressable onPress={() => setShowDatePicker(true)} style={styles.dateButton}>
-              <MaterialCommunityIcons name="calendar" size={20} color={theme.colors.primary} />
-              <Text variant="bodyLarge" style={{ color: theme.colors.onSurface, marginLeft: 8 }}>
-                {formatDate(formData.date)}
-              </Text>
+              <View style={styles.dateRow}>
+                <MaterialCommunityIcons name="calendar" size={20} color={theme.colors.primary} />
+                <Text variant="bodyLarge" style={styles.dateText} numberOfLines={1} ellipsizeMode="tail">
+                  {formatDate(formData.date)}
+                </Text>
+              </View>
             </Pressable>
           )}
 
@@ -284,6 +251,14 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
             locationType={formData.locationType}
             error={errors.location}
           />
+          {formData.location ? (
+            <View style={styles.gymNameRow}>
+              <MaterialCommunityIcons name="map-marker" size={20} color={theme.colors.primary} />
+              <Text style={styles.gymNameText} numberOfLines={2} ellipsizeMode="tail">
+                {formData.location}
+              </Text>
+            </View>
+          ) : null}
 
           {/* Duration */}
           <Input
@@ -385,131 +360,13 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
       </View>
 
       {/* Add/Edit Climb Modal */}
-      <Portal>
-        <Modal
-          visible={showClimbModal}
-          onDismiss={() => setShowClimbModal(false)}
-          contentContainerStyle={[styles.modal, { backgroundColor: theme.colors.surface }]}
-        >
-          <ScrollView>
-            <Text variant="titleLarge" style={[styles.modalTitle, { color: theme.colors.onSurface }]}>
-              {editingClimbIndex !== null ? 'Edit Climb' : 'Add Climb'}
-            </Text>
-
-            {/* Climb Name (Optional) */}
-            <Input
-              label="Route Name (optional)"
-              value={newClimb.name || ''}
-              onChangeText={(text) => setNewClimb({ ...newClimb, name: text })}
-              placeholder="e.g., The Nose, Pink One in Corner"
-            />
-
-            {/* Climb Type */}
-            <Text variant="labelMedium" style={[styles.label, { color: theme.colors.onSurfaceVariant }]}>
-              Type
-            </Text>
-            <View style={styles.typeButtons}>
-              {CLIMBING_TYPES.map((type) => (
-                <Chip
-                  key={type}
-                  selected={newClimb.climbingType === type}
-                  onPress={() => {
-                    const newGradeSystem = type === 'Bouldering' ? 'v-scale' : 'yds';
-                    setGradeSystem(newGradeSystem);
-                    setNewClimb({
-                      ...newClimb,
-                      climbingType: type as ClimbingType,
-                      gradeSystem: newGradeSystem,
-                      grade: newGradeSystem === 'v-scale' ? 'V0' : '5.6',
-                    });
-                  }}
-                  style={styles.typeChip}
-                >
-                  {type}
-                </Chip>
-              ))}
-            </View>
-
-            {/* Grade Picker */}
-            <Text variant="labelMedium" style={[styles.label, { color: theme.colors.onSurfaceVariant }]}>
-              Grade
-            </Text>
-            <GradePicker
-              gradeSystem={gradeSystem}
-              value={newClimb.grade || ''}
-              onValueChange={(grade) => setNewClimb({ ...newClimb, grade })}
-            />
-
-            {/* Attempts */}
-            <Text variant="labelMedium" style={[styles.label, { color: theme.colors.onSurfaceVariant }]}>
-              Attempts
-            </Text>
-            <View style={styles.attemptsRow}>
-              <IconButton
-                icon="minus"
-                mode="contained-tonal"
-                onPress={() => {
-                  const current = parseInt(newClimb.attempts || '1', 10);
-                  setNewClimb({ ...newClimb, attempts: String(Math.max(1, current - 1)) });
-                }}
-              />
-              <Text variant="headlineSmall" style={{ color: theme.colors.onSurface, minWidth: 40, textAlign: 'center' }}>
-                {newClimb.attempts || '1'}
-              </Text>
-              <IconButton
-                icon="plus"
-                mode="contained-tonal"
-                onPress={() => {
-                  const current = parseInt(newClimb.attempts || '1', 10);
-                  setNewClimb({ ...newClimb, attempts: String(current + 1) });
-                }}
-              />
-            </View>
-
-            {/* Result */}
-            <Text variant="labelMedium" style={[styles.label, { color: theme.colors.onSurfaceVariant }]}>
-              Result
-            </Text>
-            <View style={styles.typeButtons}>
-              {ATTEMPT_RESULTS.map((result) => (
-                <Chip
-                  key={result}
-                  selected={newClimb.result === result}
-                  onPress={() => setNewClimb({ ...newClimb, result: result as AttemptResult })}
-                  style={styles.typeChip}
-                >
-                  {result}
-                </Chip>
-              ))}
-            </View>
-
-            {/* Notes */}
-            <Input
-              label="Notes (optional)"
-              value={newClimb.notes || ''}
-              onChangeText={(text) => setNewClimb({ ...newClimb, notes: text })}
-              placeholder="Beta, conditions, etc."
-              multiline
-              numberOfLines={2}
-            />
-
-            {/* Actions */}
-            <View style={styles.modalActions}>
-              <Button
-                title="Cancel"
-                variant="outline"
-                onPress={() => setShowClimbModal(false)}
-                style={styles.modalButton}
-              />
-              <Button
-                title={editingClimbIndex !== null ? 'Save' : 'Add'}
-                onPress={handleSaveClimb}
-                style={styles.modalButton}
-              />
-            </View>
-          </ScrollView>
-        </Modal>
-      </Portal>
+      <AddClimbModal
+        visible={showClimbModal}
+        onDismiss={() => setShowClimbModal(false)}
+        onSave={handleSaveClimb}
+        initialData={editingClimbIndex !== null ? climbs[editingClimbIndex] : undefined}
+        isEditing={editingClimbIndex !== null}
+      />
     </SafeAreaView>
   );
 };
@@ -517,6 +374,35 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '100%',
+    marginBottom: 8,
+  },
+  dateText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 16,
+    minWidth: 0,
+    maxWidth: '90%',
+    color: '#333',
+  },
+  gymNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 8,
+    maxWidth: '100%',
+  },
+  gymNameText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+    minWidth: 0,
+    maxWidth: '90%',
   },
   header: {
     flexDirection: 'row',
@@ -606,40 +492,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
-  },
-  modal: {
-    margin: 20,
-    padding: 20,
-    borderRadius: 16,
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    marginBottom: 16,
-  },
-  typeButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  typeChip: {
-    marginBottom: 4,
-  },
-  attemptsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: 8,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 24,
-  },
-  modalButton: {
-    minWidth: 100,
   },
 });
 

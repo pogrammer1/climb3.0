@@ -91,7 +91,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
             <View style={styles.headerSection}>
               <View style={[styles.logoContainer, isDesktop && styles.logoContainerDesktop]}>
                 <Image
-                  source={require('../../../assets/icon.png')}
+                  source={require('../../../assets/zizi.png')}
                   style={[styles.logo, isDesktop && styles.logoDesktop]}
                   resizeMode="contain"
                 />

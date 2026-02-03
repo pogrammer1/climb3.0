@@ -14,3 +14,5 @@ export { NotificationBanner } from './NotificationBanner';
 export { Logo } from './Logo';
 export { AchievementBadge, AchievementBadgeList, AchievementCard } from './AchievementBadge';
 export { OnboardingOverlay } from './OnboardingOverlay';
+export { AddClimbModal } from './AddClimbModal';
+export type { ClimbFormData } from './AddClimbModal';

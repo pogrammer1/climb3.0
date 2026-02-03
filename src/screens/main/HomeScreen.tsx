@@ -109,7 +109,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 Hey, {profile?.displayName || 'Climber'}!
               </Text>
               <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                Ready to climb?
+                On Belay?
               </Text>
             </View>
             <Avatar
@@ -172,25 +172,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             icon="plus"
             label="Log Session"
             onPress={() => navigation.navigate('NewSession')}
-            color={theme.colors.primary}
+            color="#007d83"
           />
           <QuickAction
             icon="account-search"
             label="Find Climbers"
             onPress={() => navigation.navigate('Discover')}
-            color="#06B6D4"
+            color="#005b98"
           />
           <QuickAction
             icon="message-text"
             label="Messages"
             onPress={() => navigation.navigate('Messages')}
-            color="#1E293B"
+            color="#003385"
           />
           <QuickAction
             icon="history"
             label="History"
             onPress={() => navigation.navigate('Sessions')}
-            color="#8B5CF6"
+            color="#2d0081"
           />
         </View>
 

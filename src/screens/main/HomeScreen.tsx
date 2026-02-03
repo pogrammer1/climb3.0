@@ -120,7 +120,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             />
           </View>
           
-          {/* Inline Stats Bar */}
+          {/* Inline Stats Bar Section */}
           <View style={[styles.statsBar, { backgroundColor: theme.colors.surface }]}>
             <StatItem
               label="Sessions"
@@ -142,7 +142,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Notification Permission Banner */}
+        {/* Notification Permission Banner */} 
         <NotificationBanner />
 
         {/* Pending Requests Banner */}
@@ -172,29 +172,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             icon="plus"
             label="Log Session"
             onPress={() => navigation.navigate('NewSession')}
-            color="#007d83"
+            color="#007e8f"
           />
           <QuickAction
             icon="account-search"
             label="Find Climbers"
             onPress={() => navigation.navigate('Discover')}
-            color="#005b98"
+            color="#00749e"
           />
           <QuickAction
             icon="message-text"
             label="Messages"
             onPress={() => navigation.navigate('Messages')}
-            color="#003385"
+            color="#0451b5"
           />
           <QuickAction
             icon="history"
             label="History"
             onPress={() => navigation.navigate('Sessions')}
-            color="#2d0081"
+            color="#1414c2"
           />
         </View>
 
-        {/* Recent Sessions */}
+        {/* Recent Sessions Section */}
         <View style={styles.sectionHeader}>
           <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
             Recent Sessions
@@ -217,17 +217,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               onPress={() => navigation.navigate('SessionDetail', { sessionId: session.id })}
             >
               <View style={styles.sessionHeader}>
-                <View>
-                  <Text variant="titleMedium" style={{ color: theme.colors.onBackground }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    variant="titleMedium"
+                    style={{ color: theme.colors.onBackground }}
+                    numberOfLines={2} // default is one, maybe increase if needed in future for longer names
+                    ellipsizeMode="tail" // for extremely long names but will change prob 
+                  >
                     {session.location}
                   </Text>
                   <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                    {new Date(session.date).toLocaleDateString()} • {session.duration} min
+                    {new Date(session.date).toLocaleDateString()} • {session.duration} mins
                   </Text>
                 </View>
                 <View style={[styles.locationBadge, { backgroundColor: session.locationType === 'indoor' ? '#048A8120' : '#FF6B3520' }]}>
                   <Text variant="labelSmall" style={{ color: session.locationType === 'indoor' ? '#048A81' : '#FF6B35' }}>
-                    {session.locationType === 'indoor' ? '🏢 Indoor' : '⛰️ Outdoor'}
+                    {session.locationType === 'indoor' ? '🏢' : '⛰️'}
                   </Text>
                 </View>
               </View>
@@ -239,7 +244,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         ) : (
           <Card style={styles.emptyCard}>
             <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
-              No sessions yet. Start logging your climbs! 🧗
+              No sessions yet. Start logging your climbs! 
             </Text>
             <Button
               title="Log Your First Session"

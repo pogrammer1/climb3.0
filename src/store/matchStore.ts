@@ -27,6 +27,7 @@ interface MatchState {
   error: string | null;
   lastDoc: unknown;
   filters: ClimberSearchFilters;
+  hasAppliedInitialFilters: boolean;
   
   // Actions
   fetchClimbers: (userId: string, refresh?: boolean) => Promise<void>;
@@ -41,6 +42,7 @@ interface MatchState {
   checkMatchStatus: (userId: string, targetUserId: string) => Promise<{ status: string | null; matchId: string | null }>;
   getCompatibilityScore: (profile1: ClimberProfile, profile2: ClimberProfile) => number;
   setFilters: (filters: ClimberSearchFilters) => void;
+  setHasAppliedInitialFilters: (value: boolean) => void;
   setError: (error: string | null) => void;
   clearState: () => void;
 }
@@ -58,6 +60,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
   error: null,
   lastDoc: null,
   filters: {},
+  hasAppliedInitialFilters: false,
   
   // Actions
   fetchClimbers: async (userId, refresh = false) => {
@@ -236,6 +239,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     set({ filters });
   },
   
+  setHasAppliedInitialFilters: (value) => {
+    set({ hasAppliedInitialFilters: value });
+  },
+  
   setError: (error) => {
     set({ error });
   },
@@ -250,6 +257,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       hasMore: false,
       lastDoc: null,
       error: null,
+      hasAppliedInitialFilters: false,
     });
   },
 }));

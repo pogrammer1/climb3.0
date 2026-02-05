@@ -11,6 +11,7 @@ import {
 import { Text, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
 const ONBOARDING_KEY = '@climb_onboarding_complete';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -21,6 +22,7 @@ interface OnboardingOverlayProps {
 
 export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({ onComplete }) => {
   const theme = useTheme();
+  const navigation = useNavigation<any>();
   const [isVisible, setIsVisible] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -31,6 +33,12 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({ onComplete
       title: 'Welcome to Belay! 🧗',
       description: 'Let\'s take a quick tour to help you get started.',
       icon: 'hand-wave',
+    },
+    {
+      title: 'Set Up Your Profile',
+      description: 'Add your home gym, photo, bio, and climbing experience so other climbers can find and connect with you.',
+      icon: 'account-edit',
+      action: 'setup-profile',
     },
     {
       title: 'Navigation Bar',
@@ -95,6 +103,14 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({ onComplete
   };
 
   const handleNext = () => {
+    const step = steps[currentStep];
+    // If this step has the setup-profile action, navigate to EditProfile
+    if ((step as any).action === 'setup-profile') {
+      handleComplete().then(() => {
+        navigation.navigate('EditProfile');
+      });
+      return;
+    }
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -216,11 +232,18 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({ onComplete
             style={[styles.nextButton, { backgroundColor: theme.colors.primary }]}
           >
             <Text variant="labelLarge" style={{ color: theme.colors.onPrimary }}>
-              {isLastStep ? 'Get Started' : 'Next'}
+              {isLastStep ? 'Get Started' : (step as any).action === 'setup-profile' ? 'Set Up Profile' : 'Next'}
             </Text>
-            {!isLastStep && (
+            {!isLastStep && !(step as any).action && (
               <MaterialCommunityIcons
                 name="arrow-right"
+                size={20}
+                color={theme.colors.onPrimary}
+              />
+            )}
+            {(step as any).action === 'setup-profile' && (
+              <MaterialCommunityIcons
+                name="account-edit"
                 size={20}
                 color={theme.colors.onPrimary}
               />

@@ -328,6 +328,22 @@ export const searchClimbers = async (
       );
     }
     
+    // Filter by home gym
+    if (filters.homeGym && filters.homeGym.trim() !== '') {
+      const gymLower = filters.homeGym.trim().toLowerCase();
+      climbers = climbers.filter(c =>
+        c.homeGym && c.homeGym.toLowerCase().includes(gymLower)
+      );
+    }
+    
+    // Filter by city
+    if (filters.city && filters.city.trim() !== '') {
+      const cityLower = filters.city.trim().toLowerCase();
+      climbers = climbers.filter(c =>
+        c.location && c.location.city && c.location.city.toLowerCase().includes(cityLower)
+      );
+    }
+    
     // Calculate distance if user location provided
     if (filters.location) {
       climbers.forEach((climber) => {

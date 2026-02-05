@@ -1,6 +1,6 @@
 // Discover Screen - Find and match with other climbers
 import React, { useEffect, useCallback, useState } from 'react';
-import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, TextInput, Platform, Dimensions } from 'react-native';
 import { Text, useTheme, Chip, IconButton, Modal, Portal, Badge, Divider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -39,11 +39,13 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
     matchedProfiles,
     isLoading,
     filters,
+    hasAppliedInitialFilters,
     fetchClimbers,
     fetchPendingRequests,
     fetchAcceptedMatches,
     fetchMatchedProfiles,
     setFilters,
+    setHasAppliedInitialFilters,
     sendRequest,
   } = useMatchStore();
 
@@ -56,16 +58,45 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   const [connectedWithProfiles, setConnectedWithProfiles] = useState<ConnectedUserWithProfile[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Initial filter form state (shown before first search)
+  const [initialCity, setInitialCity] = useState('');
+  const [initialHomeGym, setInitialHomeGym] = useState('');
+  const [initialClimbingTypes, setInitialClimbingTypes] = useState<string[]>([]);
+  const [initialExperienceLevels, setInitialExperienceLevels] = useState<string[]>([]);
+  const [locationFilterMode, setLocationFilterMode] = useState<'city' | 'gym'>('city');
+
+  // Pre-fill initial filters from user's profile
+  useEffect(() => {
+    if (myProfile && !hasAppliedInitialFilters) {
+      if (myProfile.homeGym) {
+        setInitialHomeGym(myProfile.homeGym);
+        setLocationFilterMode('gym');
+      }
+      if (myProfile.location?.city) {
+        setInitialCity(myProfile.location.city);
+        if (!myProfile.homeGym) {
+          setLocationFilterMode('city');
+        }
+      }
+      if (myProfile.climbingTypes && myProfile.climbingTypes.length > 0) {
+        setInitialClimbingTypes([...myProfile.climbingTypes]);
+      }
+    }
+  }, [myProfile, hasAppliedInitialFilters]);
+
   // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (user) {
-        fetchClimbers(user.uid, true);
+        // Only fetch climbers if initial filters have been applied
+        if (hasAppliedInitialFilters) {
+          fetchClimbers(user.uid, true);
+        }
         fetchPendingRequests(user.uid);
         fetchAcceptedMatches(user.uid);
         fetchMatchedProfiles(user.uid);
       }
-    }, [user])
+    }, [user, hasAppliedInitialFilters])
   );
 
   // Track sent requests from store
@@ -150,6 +181,39 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
     }
   };
 
+  // Handle initial filter search (first time flow)
+  const handleInitialSearch = () => {
+    const newFilters: ClimberSearchFilters = {};
+
+    if (locationFilterMode === 'city' && initialCity.trim()) {
+      newFilters.city = initialCity.trim();
+    } else if (locationFilterMode === 'gym' && initialHomeGym.trim()) {
+      newFilters.homeGym = initialHomeGym.trim();
+    }
+
+    if (initialClimbingTypes.length > 0) {
+      newFilters.climbingTypes = initialClimbingTypes as any;
+    }
+
+    if (initialExperienceLevels.length > 0 && !initialExperienceLevels.includes('Any')) {
+      newFilters.experienceLevels = initialExperienceLevels as any;
+    }
+
+    setFilters(newFilters);
+    setTempFilters(newFilters);
+    setHasAppliedInitialFilters(true);
+    if (user) {
+      fetchClimbers(user.uid, true);
+    }
+  };
+
+  // Reset filters and go back to initial filter view
+  const handleResetToInitialFilters = () => {
+    setHasAppliedInitialFilters(false);
+    setFilters({});
+    setTempFilters({});
+  };
+
   const handleSendRequest = async (targetUserId: string) => {
     if (!user) return;
     setSendingRequestTo(targetUserId);
@@ -189,7 +253,9 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
 
   const activeFiltersCount =
     (tempFilters.experienceLevels?.length || 0) +
-    (tempFilters.climbingTypes?.length || 0);
+    (tempFilters.climbingTypes?.length || 0) +
+    (tempFilters.homeGym ? 1 : 0) +
+    (tempFilters.city ? 1 : 0);
 
   // Filter out connected users from discovered climbers
   const newClimbers = discoveredClimbers.filter(c => !connectedUserIds.has(c.uid));
@@ -275,11 +341,16 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
         <Text variant="headlineMedium" style={{ color: theme.colors.onBackground }}>
           Discover
         </Text>
-        <IconButton
-          icon="filter-variant"
-          mode={activeFiltersCount > 0 ? 'contained' : 'outlined'}
-          onPress={() => setShowFilters(true)}
-        />
+        {hasAppliedInitialFilters && (
+          <IconButton
+            icon="filter-variant"
+            mode={activeFiltersCount > 0 ? 'contained' : 'outlined'}
+            onPress={() => {
+              setTempFilters(filters);
+              setShowFilters(true);
+            }}
+          />
+        )}
       </View>
 
       <ScrollView 
@@ -362,7 +433,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
 
         <Divider style={styles.divider} />
 
-        {/* Find New Climbers Section - Now in middle with Pending Requests button */}
+        {/* Find New Climbers Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
@@ -372,7 +443,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
               </Text>
             </View>
             <View style={styles.sectionHeaderButtons}>
-              {activeFiltersCount > 0 && (
+              {hasAppliedInitialFilters && activeFiltersCount > 0 && (
                 <Chip compact onClose={handleClearFilters} style={{ marginRight: 8 }}>
                   {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
                 </Chip>
@@ -394,20 +465,174 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
             </View>
           </View>
 
-          {newClimbers.length === 0 ? (
-            <View style={[styles.emptySection, { backgroundColor: theme.colors.surfaceVariant }]}>
-              <MaterialCommunityIcons name="account-search-outline" size={32} color={theme.colors.onSurfaceVariant} />
-              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: 'center' }}>
-                No new climbers found
+          {!hasAppliedInitialFilters ? (
+            /* Initial Filter Selection - shown before any search */
+            <Card style={styles.initialFilterCard}>
+              <View style={styles.initialFilterHeader}>
+                <MaterialCommunityIcons name="tune-variant" size={28} color={theme.colors.primary} />
+                <Text variant="titleMedium" style={{ color: theme.colors.onBackground, marginLeft: 10 }}>
+                  Set Your Preferences
+                </Text>
+              </View>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                Filter by location and climbing preferences to find partners near you.
               </Text>
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
-                Try adjusting your filters or check back later
+
+              {/* Location Filter Toggle */}
+              <Text variant="labelLarge" style={{ color: theme.colors.onBackground, marginBottom: 8 }}>
+                Search By
               </Text>
-            </View>
+              <View style={styles.locationToggle}>
+                <Pressable
+                  style={[
+                    styles.locationToggleButton,
+                    locationFilterMode === 'city' && { backgroundColor: theme.colors.primaryContainer },
+                    { borderColor: theme.colors.outline },
+                  ]}
+                  onPress={() => setLocationFilterMode('city')}
+                >
+                  <MaterialCommunityIcons
+                    name="city-variant-outline"
+                    size={18}
+                    color={locationFilterMode === 'city' ? theme.colors.primary : theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="labelMedium"
+                    style={{
+                      color: locationFilterMode === 'city' ? theme.colors.primary : theme.colors.onSurfaceVariant,
+                      marginLeft: 6,
+                    }}
+                  >
+                    City
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.locationToggleButton,
+                    locationFilterMode === 'gym' && { backgroundColor: theme.colors.primaryContainer },
+                    { borderColor: theme.colors.outline },
+                  ]}
+                  onPress={() => setLocationFilterMode('gym')}
+                >
+                  <MaterialCommunityIcons
+                    name="warehouse"
+                    size={18}
+                    color={locationFilterMode === 'gym' ? theme.colors.primary : theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="labelMedium"
+                    style={{
+                      color: locationFilterMode === 'gym' ? theme.colors.primary : theme.colors.onSurfaceVariant,
+                      marginLeft: 6,
+                    }}
+                  >
+                    Home Gym
+                  </Text>
+                </Pressable>
+              </View>
+
+              {/* Location Input */}
+              {locationFilterMode === 'city' ? (
+                <View style={[styles.filterInputWrapper, { borderColor: theme.colors.outline, backgroundColor: theme.colors.surfaceVariant }]}>
+                  <MaterialCommunityIcons name="map-marker" size={20} color={theme.colors.onSurfaceVariant} />
+                  <TextInput
+                    style={[styles.filterInput, { color: theme.colors.onSurface }]}
+                    value={initialCity}
+                    onChangeText={setInitialCity}
+                    placeholder="Enter city (e.g. Brooklyn, Denver)"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                  />
+                  {initialCity.length > 0 && (
+                    <Pressable onPress={() => setInitialCity('')}>
+                      <MaterialCommunityIcons name="close-circle" size={18} color={theme.colors.onSurfaceVariant} />
+                    </Pressable>
+                  )}
+                </View>
+              ) : (
+                <View style={[styles.filterInputWrapper, { borderColor: theme.colors.outline, backgroundColor: theme.colors.surfaceVariant }]}>
+                  <MaterialCommunityIcons name="warehouse" size={20} color={theme.colors.onSurfaceVariant} />
+                  <TextInput
+                    style={[styles.filterInput, { color: theme.colors.onSurface }]}
+                    value={initialHomeGym}
+                    onChangeText={setInitialHomeGym}
+                    placeholder="Enter gym name"
+                    placeholderTextColor={theme.colors.onSurfaceVariant}
+                  />
+                  {initialHomeGym.length > 0 && (
+                    <Pressable onPress={() => setInitialHomeGym('')}>
+                      <MaterialCommunityIcons name="close-circle" size={18} color={theme.colors.onSurfaceVariant} />
+                    </Pressable>
+                  )}
+                </View>
+              )}
+
+              {/* Climbing Type Filter */}
+              <ChipSelector
+                label="Climbing Type"
+                options={CLIMBING_TYPES}
+                selectedValues={initialClimbingTypes}
+                onSelect={(values) => setInitialClimbingTypes(values)}
+                style={{ marginTop: 4 }}
+              />
+
+              {/* Experience Level Filter (with Any option) */}
+              <ChipSelector
+                label="Experience Level"
+                options={['Any', ...EXPERIENCE_LEVELS]}
+                selectedValues={initialExperienceLevels}
+                onSelect={(values) => {
+                  // If 'Any' is newly selected, clear other selections
+                  if (values.includes('Any') && !initialExperienceLevels.includes('Any')) {
+                    setInitialExperienceLevels(['Any']);
+                  } else if (values.length > 1 && values.includes('Any')) {
+                    // If selecting specific level while Any is selected, remove Any
+                    setInitialExperienceLevels(values.filter(v => v !== 'Any'));
+                  } else {
+                    setInitialExperienceLevels(values);
+                  }
+                }}
+              />
+
+              <Button
+                title="Find Climbers"
+                onPress={handleInitialSearch}
+                icon="magnify"
+                style={{ marginTop: 8 }}
+              />
+            </Card>
           ) : (
-            <View style={styles.climbersGrid}>
-              {newClimbers.map((climber) => renderClimberCard(climber, false))}
-            </View>
+            /* Results after filters applied */
+            <>
+              {isLoading && discoveredClimbers.length === 0 ? (
+                <View style={[styles.emptySection, { backgroundColor: theme.colors.surfaceVariant }]}>
+                  <LoadingSpinner message="Searching for climbers..." />
+                </View>
+              ) : newClimbers.length === 0 ? (
+                <View style={[styles.emptySection, { backgroundColor: theme.colors.surfaceVariant }]}>
+                  <MaterialCommunityIcons name="account-search-outline" size={32} color={theme.colors.onSurfaceVariant} />
+                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: 'center' }}>
+                    No climbers found with these filters
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', marginBottom: 12 }}>
+                    Try adjusting your filters or broadening your search
+                  </Text>
+                  <Button
+                    title="Change Filters"
+                    onPress={() => {
+                      setTempFilters(filters);
+                      setShowFilters(true);
+                    }}
+                    variant="outline"
+                    size="small"
+                    icon="tune-variant"
+                  />
+                </View>
+              ) : (
+                <View style={styles.climbersGrid}>
+                  {newClimbers.map((climber) => renderClimberCard(climber, false))}
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -415,44 +640,94 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* Filters Modal */}
+      {/* Filters Modal - Improved for mobile */}
       <Portal>
         <Modal
           visible={showFilters}
           onDismiss={() => setShowFilters(false)}
           contentContainerStyle={[styles.modal, { backgroundColor: theme.colors.surface }]}
         >
-          <Text variant="titleLarge" style={[styles.modalTitle, { color: theme.colors.onBackground }]}>
-            Filter Climbers
-          </Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.modalHeader}>
+              <Text variant="titleLarge" style={[styles.modalTitle, { color: theme.colors.onBackground }]}>
+                Filter Climbers
+              </Text>
+              <IconButton
+                icon="close"
+                size={22}
+                onPress={() => setShowFilters(false)}
+              />
+            </View>
 
-          <ChipSelector
-            label="Experience Level"
-            options={EXPERIENCE_LEVELS}
-            selectedValues={tempFilters.experienceLevels || []}
-            onSelect={(values) => setTempFilters({ ...tempFilters, experienceLevels: values as any })}
-          />
+            {/* Location Filters */}
+            <Text variant="labelLarge" style={{ color: theme.colors.onBackground, marginBottom: 8 }}>
+              Location
+            </Text>
+            <View style={[styles.filterInputWrapper, { borderColor: theme.colors.outline, backgroundColor: theme.colors.surfaceVariant, marginBottom: 12 }]}>
+              <MaterialCommunityIcons name="city-variant-outline" size={20} color={theme.colors.onSurfaceVariant} />
+              <TextInput
+                style={[styles.filterInput, { color: theme.colors.onSurface }]}
+                value={tempFilters.city || ''}
+                onChangeText={(text) => setTempFilters({ ...tempFilters, city: text || undefined })}
+                placeholder="Filter by city"
+                placeholderTextColor={theme.colors.onSurfaceVariant}
+              />
+              {(tempFilters.city || '').length > 0 && (
+                <Pressable onPress={() => setTempFilters({ ...tempFilters, city: undefined })}>
+                  <MaterialCommunityIcons name="close-circle" size={18} color={theme.colors.onSurfaceVariant} />
+                </Pressable>
+              )}
+            </View>
+            <View style={[styles.filterInputWrapper, { borderColor: theme.colors.outline, backgroundColor: theme.colors.surfaceVariant, marginBottom: 16 }]}>
+              <MaterialCommunityIcons name="warehouse" size={20} color={theme.colors.onSurfaceVariant} />
+              <TextInput
+                style={[styles.filterInput, { color: theme.colors.onSurface }]}
+                value={tempFilters.homeGym || ''}
+                onChangeText={(text) => setTempFilters({ ...tempFilters, homeGym: text || undefined })}
+                placeholder="Filter by home gym"
+                placeholderTextColor={theme.colors.onSurfaceVariant}
+              />
+              {(tempFilters.homeGym || '').length > 0 && (
+                <Pressable onPress={() => setTempFilters({ ...tempFilters, homeGym: undefined })}>
+                  <MaterialCommunityIcons name="close-circle" size={18} color={theme.colors.onSurfaceVariant} />
+                </Pressable>
+              )}
+            </View>
 
-          <ChipSelector
-            label="Climbing Types"
-            options={CLIMBING_TYPES}
-            selectedValues={tempFilters.climbingTypes || []}
-            onSelect={(values) => setTempFilters({ ...tempFilters, climbingTypes: values as any })}
-          />
-
-          <View style={styles.modalActions}>
-            <Button
-              title="Clear All"
-              onPress={handleClearFilters}
-              variant="outline"
-              style={styles.modalButton}
+            <ChipSelector
+              label="Experience Level"
+              options={EXPERIENCE_LEVELS}
+              selectedValues={tempFilters.experienceLevels || []}
+              onSelect={(values) => setTempFilters({ ...tempFilters, experienceLevels: values as any })}
             />
-            <Button
-              title="Apply Filters"
-              onPress={handleApplyFilters}
-              style={styles.modalButton}
+
+            <ChipSelector
+              label="Climbing Types"
+              options={CLIMBING_TYPES}
+              selectedValues={tempFilters.climbingTypes || []}
+              onSelect={(values) => setTempFilters({ ...tempFilters, climbingTypes: values as any })}
             />
-          </View>
+
+            <View style={styles.modalActions}>
+              <Button
+                title="Clear All"
+                onPress={() => {
+                  const cleared: ClimberSearchFilters = {};
+                  setTempFilters(cleared);
+                  setFilters(cleared);
+                  setShowFilters(false);
+                  if (user) fetchClimbers(user.uid, true);
+                }}
+                variant="outline"
+                style={styles.modalButton}
+              />
+              <Button
+                title="Apply Filters"
+                onPress={handleApplyFilters}
+                style={styles.modalButton}
+              />
+            </View>
+          </ScrollView>
         </Modal>
       </Portal>
     </SafeAreaView>
@@ -482,6 +757,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -528,6 +805,8 @@ const styles = StyleSheet.create({
   sectionHeaderButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   pendingRequestsButton: {
     flexDirection: 'row',
@@ -577,24 +856,71 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
   },
-  modal: {
-    margin: 20,
+  // Initial filter card
+  initialFilterCard: {
     padding: 20,
-    borderRadius: 12,
-    maxHeight: '80%',
+  },
+  initialFilterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationToggle: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    gap: 8,
+  },
+  locationToggleButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  filterInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'web' ? 10 : 4,
+    marginBottom: 16,
+    gap: 8,
+  },
+  filterInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: Platform.OS === 'web' ? 4 : 8,
+  } as any,
+  // Filter modal - improved for mobile
+  modal: {
+    marginHorizontal: 16,
+    marginVertical: 40,
+    padding: 20,
+    borderRadius: 16,
+    maxHeight: Dimensions.get('window').height - 100,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   modalTitle: {
-    marginBottom: 20,
     fontWeight: '600',
   },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 12,
-    marginTop: 24,
+    marginTop: 16,
+    paddingBottom: 8,
   },
   modalButton: {
-    minWidth: 120,
+    flex: 1,
   },
 });
 

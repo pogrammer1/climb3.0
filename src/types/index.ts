@@ -185,6 +185,8 @@ export interface ClimberSearchFilters {
   availableDays?: string[];
   minGrade?: string;
   maxGrade?: string;
+  homeGym?: string; // Filter by home gym name
+  city?: string; // Filter by city name
 }
 
 export interface SessionFilters {

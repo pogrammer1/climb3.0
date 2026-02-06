@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Card, Avatar, Button, AchievementBadgeList, AchievementCard } from '../../components/common';
+import { resetOnboarding } from '../../components/common';
 import { useAuthStore, useSessionStore, useMatchStore, useAchievementStore } from '../../store';
 import { signOut } from '../../services/authService';
 import { uploadProfilePhoto, toggleSearchability } from '../../services/profileService';
@@ -297,6 +298,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             left={(props) => <List.Icon {...props} icon="help-circle" />}
             right={(props) => <List.Icon {...props} icon="chevron-right" />}
             onPress={() => showAlert('Help & Support', 'For support, please email belay.app.notifications@gmail.com')}
+          />
+
+          <List.Item
+            title="Replay Onboarding"
+            left={(props) => <List.Icon {...props} icon="restart" />}
+            right={(props) => <List.Icon {...props} icon="chevron-right" />}
+            onPress={async () => {
+              await resetOnboarding();
+              showAlert('Onboarding Reset', 'The onboarding tutorial will show next time you open the app.');
+            }}
           />
         </Card>
 

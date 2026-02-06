@@ -1,6 +1,4 @@
 // Firebase Configuration
-// Replace these values with your Firebase project config from:
-// Firebase Console > Project Settings > Your apps > Web app
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';

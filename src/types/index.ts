@@ -30,6 +30,7 @@ export interface UserProfile {
   availableDays: string[];
   availableTimes: string[];
   homeGym: string | null;
+  city: string | null;
   favoriteOutdoorAreas: string[];
   yearsClimbing: number;
   certifications: string[];
@@ -217,10 +218,13 @@ export interface ProfileFormData {
   highestGradeYDS: YDSGrade | null;
   highestGradeBouldering: BoulderingGrade | null;
   homeGym: string;
+  city: string;
   yearsClimbing: string;
   partnerPreferences: string[];
   availableDays: string[];
   availableTimes: string[];
+  emailNotifications: boolean;
+  emailNotificationTypes: EmailNotificationType[];
 }
 
 export interface SessionFormData {

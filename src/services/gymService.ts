@@ -50,6 +50,62 @@ export interface PlaceAutocompleteResult {
 const GYMS_COLLECTION = 'gyms';
 
 /**
+ * Get all gym names in a given city (searches Firestore + fallback list)
+ * Returns an array of gym names (lowercased) for matching against user homeGym
+ */
+export const getGymNamesByCity = async (city: string): Promise<string[]> => {
+  const cityLower = city.trim().toLowerCase();
+  if (!cityLower) return [];
+
+  try {
+    // Search Firestore gyms collection
+    const gymsRef = collection(db, GYMS_COLLECTION);
+    const snapshot = await getDocs(query(gymsRef, limit(200)));
+    const gymNames: string[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.city && data.city.toLowerCase().includes(cityLower)) {
+        gymNames.push(data.name.toLowerCase());
+      }
+    });
+
+    // Also check the fallback gyms (hardcoded in GymPicker)
+    const FALLBACK_CITIES: Record<string, string[]> = {
+      'queens': ['Brooklyn Boulders Queensbridge'],
+      'brooklyn': ['Brooklyn Boulders Gowanus', 'The Cliffs at Gowanus'],
+      'long island city': ['The Cliffs at LIC'],
+      'worcester': ['Central Rock Gym'],
+      'los angeles': ['Sender One LAX'],
+      'san francisco': ['Touchstone Mission Cliffs'],
+      'seattle': ['Seattle Bouldering Project'],
+      'portland': ['Planet Granite Portland'],
+      'chicago': ['First Ascent Chicago'],
+      'austin': ['Austin Bouldering Project'],
+      'atlanta': ['Stone Summit Atlanta'],
+      'denver': ['Movement Denver'],
+    };
+
+    // Check fallback cities with partial matching
+    for (const [fbCity, fbGyms] of Object.entries(FALLBACK_CITIES)) {
+      if (fbCity.includes(cityLower) || cityLower.includes(fbCity)) {
+        for (const name of fbGyms) {
+          const nameLower = name.toLowerCase();
+          if (!gymNames.includes(nameLower)) {
+            gymNames.push(nameLower);
+          }
+        }
+      }
+    }
+
+    return gymNames;
+  } catch (error) {
+    console.error('Error getting gyms by city:', error);
+    return [];
+  }
+};
+
+/**
  * Search for gyms in our database first, then optionally Google Places
  */
 export const searchGyms = async (

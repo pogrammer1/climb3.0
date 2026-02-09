@@ -33,7 +33,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({ onComplete
 
   const steps = [
     {
-      title: 'Welcome to Belay! 🧗',
+      title: 'Welcome to Belay!',
       description: 'Find climbing partners, log sessions, and connect with climbers near you. Let\'s get you set up!',
       icon: 'hand-wave',
     },

@@ -131,11 +131,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             {profile?.displayName || user?.displayName || 'Climber'}
           </Text>
           
-          {profile?.location && (
+          {(profile?.city || profile?.location) && (
             <View style={styles.locationRow}>
               <MaterialCommunityIcons name="map-marker" size={16} color={theme.colors.onSurfaceVariant} />
               <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }}>
-                {profile.location.city}, {profile.location.state}
+                {profile.city || (profile.location ? `${profile.location.city}, ${profile.location.state}` : '')}
               </Text>
             </View>
           )}

@@ -184,11 +184,19 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
               <Text variant="headlineSmall" style={{ color: theme.colors.onSurface }}>
                 {climber.displayName}
               </Text>
-              {climber.location && (
+              {(climber.city || climber.location) && (
                 <View style={styles.locationRow}>
                   <MaterialCommunityIcons name="map-marker" size={16} color={theme.colors.onSurfaceVariant} />
                   <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }}>
-                    {climber.location.city}, {climber.location.state}
+                    {climber.city || (climber.location ? `${climber.location.city}, ${climber.location.state}` : '')}
+                  </Text>
+                </View>
+              )}
+              {climber.homeGym && (
+                <View style={styles.locationRow}>
+                  <MaterialCommunityIcons name="warehouse" size={16} color={theme.colors.onSurfaceVariant} />
+                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }} numberOfLines={1}>
+                    {climber.homeGym}
                   </Text>
                 </View>
               )}

@@ -28,6 +28,7 @@ import {
   ClimberSearchFilters,
   Location,
 } from '../types';
+import { getGymNamesByCity } from './gymService';
 
 /**
  * Get user profile by ID
@@ -336,12 +337,30 @@ export const searchClimbers = async (
       );
     }
     
-    // Filter by city
+    // Filter by city: match against user's city field, location.city, or gyms in that city
     if (filters.city && filters.city.trim() !== '') {
       const cityLower = filters.city.trim().toLowerCase();
-      climbers = climbers.filter(c =>
-        c.location && c.location.city && c.location.city.toLowerCase().includes(cityLower)
-      );
+      // Get gym names in this city from the gyms collection (supplementary)
+      const gymNamesInCity = await getGymNamesByCity(filters.city);
+      
+      climbers = climbers.filter(c => {
+        // Direct match: user has city field set on their profile
+        if (c.city && c.city.toLowerCase().includes(cityLower)) {
+          return true;
+        }
+        // Fallback: match against location.city
+        if (c.location?.city && c.location.city.toLowerCase().includes(cityLower)) {
+          return true;
+        }
+        // Supplementary: match homeGym against known gyms in the city
+        if (c.homeGym && gymNamesInCity.length > 0) {
+          const userGymLower = c.homeGym.toLowerCase();
+          if (gymNamesInCity.some(gn => userGymLower.includes(gn) || gn.includes(userGymLower))) {
+            return true;
+          }
+        }
+        return false;
+      });
     }
     
     // Calculate distance if user location provided

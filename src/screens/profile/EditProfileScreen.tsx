@@ -37,6 +37,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
     highestGradeYDS: null as YDSGrade | null,
     highestGradeBouldering: null as BoulderingGrade | null,
     homeGym: '',
+    city: '',
     yearsClimbing: '',
     partnerPreferences: [] as string[],
     availableDays: [] as string[],
@@ -55,6 +56,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
         highestGradeYDS: profile.highestGradeYDS || null,
         highestGradeBouldering: profile.highestGradeBouldering || null,
         homeGym: profile.homeGym || '',
+        city: profile.city || '',
         yearsClimbing: profile.yearsClimbing?.toString() || '',
         partnerPreferences: profile.partnerPreferences || [],
         availableDays: profile.availableDays || [],
@@ -143,6 +145,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
         highestGradeYDS: formData.highestGradeYDS,
         highestGradeBouldering: formData.highestGradeBouldering,
         homeGym: formData.homeGym.trim(),
+        city: formData.city.trim(),
         yearsClimbing: formData.yearsClimbing,
         partnerPreferences: formData.partnerPreferences,
         availableDays: formData.availableDays,
@@ -244,6 +247,14 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
             onChangeText={(text) => setFormData({ ...formData, homeGym: text })}
             placeholder="Your regular climbing spot"
             leftIcon="home"
+          />
+
+          <Input
+            label="City"
+            value={formData.city}
+            onChangeText={(text) => setFormData({ ...formData, city: text })}
+            placeholder="e.g. Austin, TX"
+            leftIcon="city-variant-outline"
           />
 
           <Input

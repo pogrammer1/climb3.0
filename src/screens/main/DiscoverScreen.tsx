@@ -65,7 +65,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   const [initialExperienceLevels, setInitialExperienceLevels] = useState<string[]>([]);
   const [locationFilterMode, setLocationFilterMode] = useState<'city' | 'gym'>('city');
 
-  // Pre-fill initial filters from user's profile
+  // Pre-fill initial filters from user's profile (only when filter setup is showing)
   useEffect(() => {
     if (myProfile && !hasAppliedInitialFilters) {
       if (myProfile.homeGym) {
@@ -83,6 +83,11 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
       }
     }
   }, [myProfile, hasAppliedInitialFilters]);
+
+  // Sync tempFilters when filters change
+  useEffect(() => {
+    setTempFilters(filters);
+  }, [filters]);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
@@ -176,9 +181,8 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
     setTempFilters({});
     setFilters({});
     setShowFilters(false);
-    if (user) {
-      fetchClimbers(user.uid, true);
-    }
+    // Reset back to initial filter setup state
+    setHasAppliedInitialFilters(false);
   };
 
   // Handle initial filter search (first time flow)
@@ -275,15 +279,23 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
               {item.displayName}
             </Text>
             <View style={styles.locationRow}>
-              {item.location && (
+              {(item.city || item.location) && (
                 <>
                   <MaterialCommunityIcons name="map-marker" size={14} color={theme.colors.onSurfaceVariant} />
                   <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }}>
-                    {item.location.city}, {item.location.state}
+                    {item.city || (item.location ? `${item.location.city}, ${item.location.state}` : '')}
                   </Text>
                 </>
               )}
             </View>
+            {item.homeGym && (
+              <View style={styles.locationRow}>
+                <MaterialCommunityIcons name="warehouse" size={14} color={theme.colors.onSurfaceVariant} />
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 4 }} numberOfLines={1}>
+                  {item.homeGym}
+                </Text>
+              </View>
+            )}
             {item.experienceLevel && (
               <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
                 {item.experienceLevel} • {item.yearsClimbing || 0} yrs
@@ -441,15 +453,8 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
               <Text variant="titleMedium" style={{ color: theme.colors.onBackground, marginLeft: 8 }}>
                 Find New Climbers
               </Text>
-            </View>
-            <View style={styles.sectionHeaderButtons}>
-              {hasAppliedInitialFilters && activeFiltersCount > 0 && (
-                <Chip compact onClose={handleClearFilters} style={{ marginRight: 8 }}>
-                  {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
-                </Chip>
-              )}
               <Pressable 
-                style={[styles.pendingRequestsButton, { backgroundColor: theme.colors.primaryContainer }]}
+                style={[styles.pendingRequestsButton, { backgroundColor: theme.colors.primaryContainer, marginLeft: 10 }]}
                 onPress={() => navigation.navigate('MatchRequests')}
               >
                 <MaterialCommunityIcons name="account-clock" size={18} color={theme.colors.primary} />
@@ -463,6 +468,11 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
                 )}
               </Pressable>
             </View>
+            {hasAppliedInitialFilters && activeFiltersCount > 0 && (
+              <Chip compact onClose={handleClearFilters} style={{ marginRight: 8 }}>
+                {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
+              </Chip>
+            )}
           </View>
 
           {!hasAppliedInitialFilters ? (
@@ -539,7 +549,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
                     style={[styles.filterInput, { color: theme.colors.onSurface }]}
                     value={initialCity}
                     onChangeText={setInitialCity}
-                    placeholder="Enter city (e.g. Brooklyn, Denver)"
+                    placeholder="Enter city (e.g. Austin, Dallas)"
                     placeholderTextColor={theme.colors.onSurfaceVariant}
                   />
                   {initialCity.length > 0 && (
@@ -716,13 +726,14 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
                   setTempFilters(cleared);
                   setFilters(cleared);
                   setShowFilters(false);
-                  if (user) fetchClimbers(user.uid, true);
+                  // Reset back to initial filter setup state
+                  setHasAppliedInitialFilters(false);
                 }}
                 variant="outline"
                 style={styles.modalButton}
               />
               <Button
-                title="Apply Filters"
+                title="Apply"
                 onPress={handleApplyFilters}
                 style={styles.modalButton}
               />
@@ -885,15 +896,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: Platform.OS === 'web' ? 10 : 4,
     marginBottom: 16,
-    gap: 8,
+    gap: 6,
   },
   filterInput: {
     flex: 1,
     fontSize: 15,
     paddingVertical: Platform.OS === 'web' ? 4 : 8,
+    minWidth: 0,
   } as any,
   // Filter modal - improved for mobile
   modal: {

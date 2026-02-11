@@ -1,6 +1,6 @@
 // Custom Button Component with loading state and variants
 import React from 'react';
-import { StyleSheet, ViewStyle, TextStyle, Platform } from 'react-native';
+import { StyleSheet, ViewStyle, TextStyle, Platform, StyleProp } from 'react-native';
 import { Button as PaperButton, ActivityIndicator } from 'react-native-paper';
 import { brandColors } from '../../constants/theme';
 
@@ -12,8 +12,8 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   icon?: string;
-  style?: ViewStyle;
-  labelStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
   fullWidth?: boolean;
 }
 
@@ -75,7 +75,7 @@ export const Button: React.FC<ButtonProps> = ({
   // Darker ripple/hover color for better visibility - fills entire button
   const rippleColor = variant === 'primary' 
     ? 'rgba(0, 0, 0, 0.25)' 
-    : 'rgba(99, 102, 241, 0.35)';
+    : 'rgba(36, 116, 246, 0.35)';
 
   return (
     <PaperButton

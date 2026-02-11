@@ -20,28 +20,19 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) =
   const theme = useTheme();
   
   return (
-    <View
-      style={[
-        styles.featureCard,
-        {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.primary,
-          borderWidth: 2,
-          borderStyle: 'solid',
-          shadowColor: theme.colors.primary,
-        },
-      ]}
-    >
-      <View style={[styles.featureIconContainer, { backgroundColor: theme.colors.primaryContainer }]}>
-        <MaterialCommunityIcons 
-          name={icon} 
-          size={32} 
-          color={theme.colors.primary} 
-        />
+    <View style={styles.featureCard}>
+      <View style={styles.featureRow}>
+        <View style={[styles.featureIconContainer, { backgroundColor: theme.colors.primaryContainer }]}>
+          <MaterialCommunityIcons 
+            name={icon} 
+            size={28} 
+            color={theme.colors.primary} 
+          />
+        </View>
+        <Text variant="titleMedium" style={[styles.featureTitle, { color: theme.colors.onSurface, fontWeight: 'bold' }]}>
+          {title}
+        </Text>
       </View>
-      <Text variant="titleMedium" style={[styles.featureTitle, { color: theme.colors.onSurface, fontWeight: 'bold' }]}>
-        {title}
-      </Text>
       <Text variant="bodyMedium" style={[styles.featureDescription, { color: theme.colors.onSurface }]}>
         {description}
       </Text>
@@ -119,7 +110,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
               title="Climb on"
               onPress={handleClimbOn}
               fullWidth
-              style={isDesktop ? styles.ctaButtonDesktop : styles.ctaButton}
+              variant="outline"
+              style={[
+                isDesktop ? styles.ctaButtonDesktop : styles.ctaButton,
+                { backgroundColor: '#ffffff', borderColor: '#000000', borderWidth: 1 }
+              ]}
+              labelStyle={{ color: '#000000', fontWeight: '600' }}
             />
           </View>
 
@@ -127,20 +123,18 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
           <View style={[styles.featuresSection, isDesktop && styles.featuresSectionDesktop]}>
             <View style={[styles.featuresGrid, isDesktop && styles.featuresGridDesktop]}>
               {features.map((feature, index) => (
-                <View 
-                  key={index} 
-                  style={[
-                    styles.featureCardWrapper,
-                    isDesktop && styles.featureCardWrapperDesktop
-                  ]}
-                >
+                <View key={index} style={styles.featureCardWrapper}>
+                  {/* Divider line - inset on left and right */}
+                  <View style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
                   <FeatureCard
-                    icon={feature.icon}
                     title={feature.title}
+                    icon={feature.icon}
                     description={feature.description}
                   />
                 </View>
               ))}
+              {/* Bottom divider */}
+              <View style={[styles.divider, { backgroundColor: theme.colors.outlineVariant }]} />
             </View>
           </View>
 
@@ -216,7 +210,7 @@ const styles = StyleSheet.create({
   ctaContainer: {
     alignItems: 'center',
     width: '100%',
-    maxWidth: 200,
+    maxWidth: 150,
     alignSelf: 'center',
     marginTop: 'auto',
     paddingTop: 40,
@@ -249,50 +243,47 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   featuresGrid: {
-    gap: 16,
+    gap: 0,
   },
   featuresGridDesktop: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 24,
+    gap: 0,
   },
   featureCardWrapper: {
     width: '100%',
   },
-  featureCardWrapperDesktop: {
-    flex: 1,
-    maxWidth: 320,
+  divider: {
+    height: 1,
+    marginHorizontal: 16,
   },
   featureCard: {
-    padding: 24,
-    borderRadius: 16,
+    paddingVertical: 20,
+    paddingLeft: 16, // align with divider inset (ScrollView padding 24 + divider margin 16)
+    paddingRight: 4,
+    alignItems: 'flex-start',
+  },
+  featureRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    minHeight: 220,
-    justifyContent: 'flex-start',
+    marginBottom: 6,
   },
   featureIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginRight: 12,
   },
   featureTitle: {
     fontWeight: '600',
-    marginBottom: 8,
-    textAlign: 'center',
-    fontSize: 28,
+    textAlign: 'left',
+    fontSize: 22,
   },
   featureDescription: {
-    textAlign: 'center',
-    lineHeight: 26,
-    fontSize: 16,
+    textAlign: 'left',
+    lineHeight: 22,
+    fontSize: 15,
+    paddingLeft: 0, // start under the feature icon
   },
 });
 

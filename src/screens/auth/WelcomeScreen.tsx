@@ -51,8 +51,8 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) =
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
   const theme = useTheme();
-  const { width } = useWindowDimensions();
-  const isDesktop = Platform.OS === 'web' && width > 768;
+  const { width, height } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width > 768; // height used below to cap CTA spacing on desktop
 
   const handleClimbOn = () => {
     navigation.navigate('Login');
@@ -85,17 +85,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
       >
         {/* Main Content Wrapper */}
         <View style={styles.mainContent}>
-          {/* Hero Section */}
+          {/* Hero Section - Title + Icon inline at the top */}
           <View style={styles.heroSection}>
-            {/* Header Section with Logo */}
-            <View style={styles.headerSection}>
-              <View style={[styles.logoContainer, isDesktop && styles.logoContainerDesktop]}>
-                <Image
-                  source={require('../../../assets/zizi.png')}
-                  style={[styles.logo, isDesktop && styles.logoDesktop]}
-                  resizeMode="contain"
-                />
-              </View>
+            <View style={[styles.headerSection, isDesktop && styles.headerSectionDesktop]}>
               <Text 
                 variant="displayLarge" 
                 style={[
@@ -106,10 +98,32 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
               >
                 Belay
               </Text>
+              <View style={[styles.logoContainer, isDesktop && styles.logoContainerDesktop]}>
+                <Image
+                  source={require('../../../assets/zizi.png')}
+                  style={[styles.logo, isDesktop && styles.logoDesktop]}
+                  resizeMode="contain"
+                />
+              </View>
             </View>
           </View>
 
-          {/* Features Section */}
+          {/* CTA Button - visible near bottom of initial viewport */}
+          <View style={[
+            styles.ctaContainer,
+            isDesktop && styles.ctaContainerDesktop,
+            // On desktop, cap the top margin so the CTA doesn't get pushed too far down by tall viewports
+            isDesktop && { marginTop: Math.min(160, height * 0.45) }
+          ]}>
+            <Button
+              title="Climb on"
+              onPress={handleClimbOn}
+              fullWidth
+              style={isDesktop ? styles.ctaButtonDesktop : styles.ctaButton}
+            />
+          </View>
+
+          {/* Features Section - below the fold */}
           <View style={[styles.featuresSection, isDesktop && styles.featuresSectionDesktop]}>
             <View style={[styles.featuresGrid, isDesktop && styles.featuresGridDesktop]}>
               {features.map((feature, index) => (
@@ -130,28 +144,18 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
             </View>
           </View>
 
-          {/* CTA Button */}
-          <View style={[styles.ctaContainer, isDesktop && styles.ctaContainerDesktop]}>
+          {/* Footer - right below CTA */}
+          <View style={styles.footer}>
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+              Already have an account?
+            </Text>
             <Button
-              title="Climb on"
+              title="Sign In"
               onPress={handleClimbOn}
-              fullWidth
-              style={isDesktop ? styles.ctaButtonDesktop : styles.ctaButton}
+              variant="text"
+              size="small"
             />
           </View>
-        </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            Already have an account?
-          </Text>
-          <Button
-            title="Sign In"
-            onPress={handleClimbOn}
-            variant="text"
-            size="small"
-          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -169,25 +173,29 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
-    justifyContent: 'center',
   },
   heroSection: {
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 8,
+    paddingTop: 16,
+    paddingBottom: 0,
   },
   headerSection: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 0,
+  },
+  headerSectionDesktop: {
     marginBottom: 16,
   },
   logoContainer: {
-    width: 160,
-    height: 160,
-    marginBottom: 24,
+    width: 80,
+    height: 80,
+    marginLeft: 8,
   },
   logoContainerDesktop: {
-    width: 200,
-    height: 200,
+    width: 120,
+    height: 120,
   },
   logo: {
     width: '100%',
@@ -199,8 +207,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontWeight: 'bold',
-    fontSize: 72,
-    marginBottom: 16,
+    fontSize: 56,
     letterSpacing: 2,
   },
   titleDesktop: {
@@ -209,21 +216,31 @@ const styles = StyleSheet.create({
   ctaContainer: {
     alignItems: 'center',
     width: '100%',
-    maxWidth: 120,
+    maxWidth: 200,
     alignSelf: 'center',
+    marginTop: 'auto',
+    paddingTop: 40,
   },
   ctaContainerDesktop: {
-    maxWidth: 130,
+    maxWidth: 200,
     alignItems: 'center',
   },
   ctaButton: {
-    marginTop: 8,
+    marginTop: 0,
   },
   ctaButtonDesktop: {
-    marginTop: 8,
+    marginTop: 0,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 12,
+    paddingBottom: 24,
+    gap: 4,
   },
   featuresSection: {
-    marginTop: 0,
+    marginTop: 32,
     marginBottom: 32,
   },
   featuresSectionDesktop: {
@@ -276,14 +293,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 26,
     fontSize: 16,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 'auto',
-    paddingTop: 16,
-    gap: 4,
   },
 });
 

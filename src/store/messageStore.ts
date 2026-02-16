@@ -90,14 +90,9 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       // Calculate total unread count from conversations
       let totalUnread = 0;
       conversations.forEach((conversation) => {
-        // Use participantsMap which keeps the original map structure
-        const participantsMap = (conversation as any).participantsMap || 
-                                (conversation as any).participants;
-        if (typeof participantsMap === 'object' && !Array.isArray(participantsMap)) {
-          const userParticipant = participantsMap[userId];
-          if (userParticipant) {
-            totalUnread += userParticipant.unreadCount || 0;
-          }
+        const userParticipant = conversation.participantsMap?.[userId];
+        if (userParticipant) {
+          totalUnread += userParticipant.unreadCount || 0;
         }
       });
       

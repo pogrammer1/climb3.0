@@ -14,7 +14,7 @@ import {
   onSnapshot,
   serverTimestamp,
   DocumentSnapshot,
-  arrayUnion,
+  writeBatch,
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -80,6 +80,7 @@ export const getOrCreateConversation = async (
       data: {
         id: docRef.id,
         ...newConversation,
+        participantsMap: newConversation.participants,
         participants: Object.values(newConversation.participants),
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -315,29 +316,37 @@ export const markMessagesAsRead = async (
       
       await updateDoc(conversationRef, {
         participants: updatedParticipants,
+        updatedAt: serverTimestamp(),
       });
     }
-    
-    // Mark individual messages as read - get all messages and filter client-side
-    const messagesRef = collection(db, COLLECTIONS.CONVERSATIONS, conversationId, COLLECTIONS.MESSAGES);
-    const messagesSnap = await getDocs(messagesRef);
-    
-    const updatePromises: Promise<void>[] = [];
-    
-    messagesSnap.docs.forEach((docSnap) => {
+
+    // Mark only recent unread messages as read to avoid full collection scans
+    const recentMessagesQuery = query(
+      collection(db, COLLECTIONS.CONVERSATIONS, conversationId, COLLECTIONS.MESSAGES),
+      orderBy('createdAt', 'desc'),
+      limit(100)
+    );
+    const recentMessagesSnap = await getDocs(recentMessagesQuery);
+
+    const batch = writeBatch(db);
+    let updatesCount = 0;
+
+    recentMessagesSnap.docs.forEach((docSnap) => {
       const messageData = docSnap.data();
-      // Only update messages not already read by this user
-      if (!messageData.readBy?.includes(userId)) {
-        updatePromises.push(
-          updateDoc(docSnap.ref, {
-            readBy: arrayUnion(userId),
-          })
-        );
+      const alreadyRead = Array.isArray(messageData.readBy) && messageData.readBy.includes(userId);
+      const isOwnMessage = messageData.senderId === userId;
+
+      if (!alreadyRead && !isOwnMessage) {
+        const currentReadBy = Array.isArray(messageData.readBy) ? messageData.readBy : [];
+        batch.update(docSnap.ref, {
+          readBy: [...currentReadBy, userId],
+        });
+        updatesCount += 1;
       }
     });
-    
-    if (updatePromises.length > 0) {
-      await Promise.all(updatePromises);
+
+    if (updatesCount > 0) {
+      await batch.commit();
     }
     
     return {
@@ -438,8 +447,7 @@ export const getTotalUnreadCount = async (userId: string): Promise<number> => {
     
     let totalUnread = 0;
     for (const conversation of conversationsResult.data) {
-      // Use participantsMap which keeps the original map structure
-      const participantsMap = (conversation as any).participantsMap || {};
+      const participantsMap = conversation.participantsMap || {};
       const participantData = participantsMap[userId];
       if (participantData) {
         totalUnread += participantData.unreadCount || 0;

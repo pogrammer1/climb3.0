@@ -65,14 +65,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
 
   const getOtherParticipant = () => {
     if (!currentConversation || !user) return { displayName: 'Chat', photoURL: null };
-    
-    // Use participantsMap which keeps the original map structure with userId keys
-    const participantsMap = (currentConversation as any).participantsMap || (currentConversation as any).participants;
-    if (typeof participantsMap === 'object' && !Array.isArray(participantsMap)) {
-      const otherUserId = Object.keys(participantsMap).find((id) => id !== user.uid);
-      if (otherUserId) {
-        return participantsMap[otherUserId];
-      }
+
+    const participantsMap = currentConversation.participantsMap || {};
+    const otherUserId = Object.keys(participantsMap).find((id) => id !== user.uid);
+    if (otherUserId) {
+      return participantsMap[otherUserId];
     }
     return { displayName: 'Chat', photoURL: null };
   };
@@ -127,15 +124,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
   // Get message status for read receipts
   const getMessageStatus = (message: Message): MessageStatus => {
     if (!user) return 'sent';
-    
-    // If the other participant has read this message
-    // Use participantsMap which keeps the original map structure
-    const participantsMap = (currentConversation as any)?.participantsMap || 
-                            (currentConversation as any)?.participants || {};
-    
-    const otherParticipantId = typeof participantsMap === 'object' && !Array.isArray(participantsMap)
-      ? Object.keys(participantsMap).find(id => id !== user.uid)
-      : null;
+
+    const participantsMap = currentConversation?.participantsMap || {};
+    const otherParticipantId = Object.keys(participantsMap).find(id => id !== user.uid);
     
     if (otherParticipantId && message.readBy?.includes(otherParticipantId)) {
       return 'read';

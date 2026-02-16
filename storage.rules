@@ -17,6 +17,12 @@ service firebase.storage {
     function isImage() {
       return request.resource.contentType.matches('image/.*');
     }
+
+    // Helper function to check if user is in the conversation
+    function isConversationParticipant(conversationId) {
+      return isAuthenticated() &&
+             request.auth.uid in firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participantIds;
+    }
     
     // Profile photos
     match /profile-photos/{userId}/{fileName} {
@@ -53,12 +59,11 @@ service firebase.storage {
     
     // Chat images (shared in conversations)
     match /chat-images/{conversationId}/{fileName} {
-      // For now, any authenticated user can read chat images
-      // In production, you'd want to verify conversation membership
-      allow read: if isAuthenticated();
-      
-      // Authenticated users can upload chat images
-      allow write: if isAuthenticated() &&
+      // Only conversation participants can access chat images
+      allow read: if isConversationParticipant(conversationId);
+
+      // Only participants can upload valid chat images
+      allow write: if isConversationParticipant(conversationId) &&
                      isImage() &&
                      isValidSize();
     }

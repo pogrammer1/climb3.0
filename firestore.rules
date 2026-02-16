@@ -18,6 +18,12 @@ service cloud.firestore {
       return isAuthenticated() && 
              request.auth.uid in conversationData.participantIds;
     }
+
+    // Helper: check whether the current user owns a session document
+    function isSessionOwner(sessionId) {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid;
+    }
     
     // Users collection
     match /users/{userId} {
@@ -78,14 +84,15 @@ service cloud.firestore {
     
     // Climbs collection (individual climbs within sessions)
     match /climbs/{climbId} {
-      // Users can read climbs from their sessions
-      allow read: if isAuthenticated();
-      
-      // Users can create climbs for their sessions
-      allow create: if isAuthenticated();
-      
-      // Users can update/delete climbs
-      allow update, delete: if isAuthenticated();
+      // Users can only access climbs tied to sessions they own
+      allow read: if isSessionOwner(resource.data.sessionId);
+
+      // Users can only create climbs for their own sessions
+      allow create: if request.resource.data.sessionId is string &&
+                      isSessionOwner(request.resource.data.sessionId);
+
+      // Users can only update/delete climbs tied to sessions they own
+      allow update, delete: if isSessionOwner(resource.data.sessionId);
     }
     
     // Matches collection
@@ -147,8 +154,9 @@ service cloud.firestore {
     
     // Discovery/potential matches collection (for the discover feature)
     match /potentialMatches/{matchId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
     
     // Gyms collection (climbing gyms and outdoor locations)

@@ -64,21 +64,17 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({ navigation }) =>
   };
 
   const getOtherParticipant = (conversation: Conversation) => {
-    // Use participantsMap which keeps the original map structure with userId keys
-    const participantsMap = (conversation as any).participantsMap || (conversation as any).participants;
-    if (typeof participantsMap === 'object' && !Array.isArray(participantsMap)) {
-      const otherUserId = Object.keys(participantsMap).find((id) => id !== user?.uid);
-      if (otherUserId) {
-        return participantsMap[otherUserId];
-      }
+    const participantsMap = conversation.participantsMap || {};
+    const otherUserId = Object.keys(participantsMap).find((id) => id !== user?.uid);
+    if (otherUserId) {
+      return participantsMap[otherUserId];
     }
     return { displayName: 'Unknown', photoURL: null };
   };
 
   const getUnreadCount = (conversation: Conversation) => {
-    // Use participantsMap which keeps the original map structure with userId keys
-    const participantsMap = (conversation as any).participantsMap || (conversation as any).participants;
-    if (typeof participantsMap === 'object' && !Array.isArray(participantsMap) && user) {
+    const participantsMap = conversation.participantsMap || {};
+    if (user) {
       return participantsMap[user.uid]?.unreadCount || 0;
     }
     return 0;
@@ -87,7 +83,7 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({ navigation }) =>
   const renderConversationItem = ({ item }: { item: Conversation }) => {
     const otherParticipant = getOtherParticipant(item);
     const unreadCount = getUnreadCount(item);
-    const lastMessage = item.lastMessage as any;
+    const lastMessage = item.lastMessage;
 
     return (
       <Pressable

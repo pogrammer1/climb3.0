@@ -109,6 +109,7 @@ export interface Conversation {
   id: string;
   participantIds: string[];
   participants: ConversationParticipant[];
+  participantsMap?: ConversationParticipantMap;
   lastMessage: Message | null;
   lastMessageAt: Date | null;
   createdAt: Date;
@@ -120,6 +121,8 @@ export interface ConversationParticipant {
   photoURL: string | null;
   unreadCount: number;
 }
+
+export type ConversationParticipantMap = Record<string, ConversationParticipant>;
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
 

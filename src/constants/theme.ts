@@ -5,7 +5,7 @@ import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
 const brandColors = {
   primary: '#000000',      // black primary
   secondary: '#23272A',    // Darker grey secondary
-  accent: '#636161',       // Light grey accent
+  accent: '#2d2d2d',       // Light grey accent
   success: '#6EE7B7',      // Muted green
   warning: '#FBBF24',      // Muted amber
   error: '#EF4444',        // Red 
@@ -29,7 +29,7 @@ export const lightTheme = {
     onBackground: '#23272A',
     onSurface: '#000000',
     onSurfaceVariant: '#000000',
-    outline: '#464646',
+    outline: '#242424',
     primaryContainer: '#ffffff',
     onPrimaryContainer: '#23272A',
   },
@@ -38,7 +38,7 @@ export const lightTheme = {
     warning: brandColors.warning,
     info: brandColors.info,
     gradientStart: '#282a2d',
-    gradientEnd: '#686868',
+    gradientEnd: '#363636',
     cardBackground: '#FFFFFF',
     inputBackground: '#ffffff',
   },
@@ -55,13 +55,13 @@ export const darkTheme = {
     error: brandColors.error,
     background: '#18181B', // darker grey
     surface: '#23272A',
-    surfaceVariant: '#44484C',
+    surfaceVariant: '#000000',
     onPrimary: '#FFFFFF',
     onSecondary: '#FFFFFF',
     onBackground: '#F4F4F5',
     onSurface: '#E5E7EB',
-    onSurfaceVariant: '#A3A3A3',
-    outline: '#44484C',
+    onSurfaceVariant: '#2d2d2d',
+    outline: '#363434',
     primaryContainer: '#23272A',
     onPrimaryContainer: '#F4F4F5',
   },

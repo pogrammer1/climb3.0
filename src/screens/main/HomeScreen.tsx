@@ -172,7 +172,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             icon="plus"
             label="Log Session"
             onPress={() => navigation.navigate('NewSession')}
-            color="#007e8f"
+            color="#00749e"
           />
           <QuickAction
             icon="account-search"
@@ -184,13 +184,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             icon="message-text"
             label="Messages"
             onPress={() => navigation.navigate('Messages')}
-            color="#0451b5"
+            color="#00749e"
           />
           <QuickAction
             icon="history"
             label="History"
             onPress={() => navigation.navigate('Sessions')}
-            color="#1414c2"
+            color="#00749e"
           />
         </View>
 

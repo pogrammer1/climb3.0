@@ -14,6 +14,7 @@
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:rules": "npx firebase emulators:exec --only firestore,storage \"jest --config jest.rules.config.cjs\"",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -53,6 +54,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@firebase/rules-unit-testing": "^3.0.4",
     "@types/leaflet": "^1.9.21",
     "@types/react": "~18.2.45",
     "@types/react-native": "~0.73.0",

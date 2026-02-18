@@ -7,22 +7,29 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+
+    // Helper to normalize authenticated user id across token shapes
+    function authUid() {
+      return request.auth.uid != null
+        ? request.auth.uid
+        : (request.auth.token.sub != null ? request.auth.token.sub : request.auth.token.user_id);
+    }
     
     // Helper function to check if user owns the resource
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isAuthenticated() && authUid() == userId;
     }
     
     // Helper function to check if user is participant in conversation
     function isParticipant(conversationData) {
       return isAuthenticated() && 
-             request.auth.uid in conversationData.participantIds;
+             authUid() in conversationData.participantIds;
     }
 
     // Helper: check whether the current user owns a session document
     function isSessionOwner(sessionId) {
       return isAuthenticated() &&
-             get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid;
+             get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == authUid();
     }
     
     // Users collection
@@ -71,15 +78,15 @@ service cloud.firestore {
     match /sessions/{sessionId} {
       // Users can only read their own sessions
       allow read: if isAuthenticated() && 
-                    resource.data.userId == request.auth.uid;
+                    resource.data.userId == authUid();
       
       // Users can create sessions for themselves
       allow create: if isAuthenticated() && 
-                      request.resource.data.userId == request.auth.uid;
+                      request.resource.data.userId == authUid();
       
       // Users can update/delete their own sessions
       allow update, delete: if isAuthenticated() && 
-                              resource.data.userId == request.auth.uid;
+                              resource.data.userId == authUid();
     }
     
     // Climbs collection (individual climbs within sessions)
@@ -99,21 +106,42 @@ service cloud.firestore {
     match /matches/{matchId} {
       // Users can read matches where they are involved
       allow read: if isAuthenticated() && 
-                    (resource.data.userId == request.auth.uid || 
-                     resource.data.matchedUserId == request.auth.uid);
+                    (resource.data.userId == authUid() || 
+                     resource.data.matchedUserId == authUid());
       
       // Users can create matches
       allow create: if isAuthenticated() && 
-                      request.resource.data.userId == request.auth.uid;
+                      request.resource.data.userId == authUid() &&
+                      request.resource.data.keys().hasOnly([
+                        'userId',
+                        'matchedUserId',
+                        'status',
+                        'initiatedBy',
+                        'createdAt',
+                        'updatedAt'
+                      ]) &&
+                      request.resource.data.initiatedBy == authUid();
       
       // Users can update matches they're involved in
       allow update: if isAuthenticated() && 
-                      (resource.data.userId == request.auth.uid || 
-                       resource.data.matchedUserId == request.auth.uid);
+                      (resource.data.userId == authUid() || 
+                       resource.data.matchedUserId == authUid()) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.matchedUserId == resource.data.matchedUserId &&
+                      request.resource.data.initiatedBy == resource.data.initiatedBy &&
+                      request.resource.data.createdAt == resource.data.createdAt &&
+                      request.resource.data.keys().hasOnly([
+                        'userId',
+                        'matchedUserId',
+                        'status',
+                        'initiatedBy',
+                        'createdAt',
+                        'updatedAt'
+                      ]);
       
       // Users can delete matches they created
       allow delete: if isAuthenticated() && 
-                      resource.data.userId == request.auth.uid;
+                      resource.data.userId == authUid();
     }
     
     // Conversations collection
@@ -123,10 +151,29 @@ service cloud.firestore {
       
       // Authenticated users can create conversations
       allow create: if isAuthenticated() && 
-                      request.auth.uid in request.resource.data.participantIds;
+                      authUid() in request.resource.data.participantIds &&
+                      request.resource.data.participantIds.size() == 2 &&
+                      request.resource.data.keys().hasOnly([
+                        'participantIds',
+                        'participants',
+                        'lastMessage',
+                        'lastMessageAt',
+                        'createdAt',
+                        'updatedAt'
+                      ]);
       
       // Participants can update conversation (e.g., read receipts)
-      allow update: if isParticipant(resource.data);
+      allow update: if isParticipant(resource.data) &&
+                      request.resource.data.participantIds == resource.data.participantIds &&
+                      request.resource.data.createdAt == resource.data.createdAt &&
+                      request.resource.data.keys().hasOnly([
+                        'participantIds',
+                        'participants',
+                        'lastMessage',
+                        'lastMessageAt',
+                        'createdAt',
+                        'updatedAt'
+                      ]);
       
       // Participants can delete conversation
       allow delete: if isParticipant(resource.data);
@@ -135,28 +182,58 @@ service cloud.firestore {
       match /messages/{messageId} {
         // Conversation participants can read messages
         allow read: if isAuthenticated() && 
-                      request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+                      authUid() in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
         
         // Participants can send messages
         allow create: if isAuthenticated() && 
-                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
-                        request.resource.data.senderId == request.auth.uid;
+                        authUid() in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
+                        request.resource.data.senderId == authUid() &&
+                        request.resource.data.conversationId == conversationId &&
+                        request.resource.data.readBy.size() == 1 &&
+                        authUid() in request.resource.data.readBy &&
+                        request.resource.data.keys().hasOnly([
+                          'conversationId',
+                          'senderId',
+                          'text',
+                          'imageUrl',
+                          'readBy',
+                          'createdAt'
+                        ]);
         
         // Participants can update messages (for read receipts) or sender can edit their message
         allow update: if isAuthenticated() && 
-                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+                        authUid() in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
+                        request.resource.data.senderId == resource.data.senderId &&
+                        request.resource.data.conversationId == resource.data.conversationId &&
+                        request.resource.data.text == resource.data.text &&
+                        request.resource.data.imageUrl == resource.data.imageUrl &&
+                        request.resource.data.createdAt == resource.data.createdAt &&
+                        request.resource.data.keys().hasOnly([
+                          'conversationId',
+                          'senderId',
+                          'text',
+                          'imageUrl',
+                          'readBy',
+                          'createdAt'
+                        ]) &&
+                        authUid() in request.resource.data.readBy;
         
         // Message sender can delete their own message
         allow delete: if isAuthenticated() && 
-                        resource.data.senderId == request.auth.uid;
+                        resource.data.senderId == authUid();
       }
     }
     
     // Discovery/potential matches collection (for the discover feature)
     match /potentialMatches/{matchId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.userId == authUid();
+      allow create: if isAuthenticated() &&
+                      request.resource.data.userId == authUid() &&
+                      request.resource.data.keys().hasOnly(['userId', 'score', 'createdAt', 'updatedAt']);
+      allow update: if isAuthenticated() &&
+                      resource.data.userId == authUid() &&
+                      request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuthenticated() && resource.data.userId == authUid();
     }
     
     // Gyms collection (climbing gyms and outdoor locations)
@@ -172,7 +249,7 @@ service cloud.firestore {
       
       // Only the user who added the gym can delete it
       allow delete: if isAuthenticated() && 
-                      resource.data.addedBy == request.auth.uid;
+                      resource.data.addedBy == authUid();
     }
     
     // Schedules collection (user climbing availability)

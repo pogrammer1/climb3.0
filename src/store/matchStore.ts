@@ -1,5 +1,6 @@
 // Match Store - Climber matching state management
 import { create } from 'zustand';
+import { DocumentSnapshot } from 'firebase/firestore';
 import {
   sendMatchRequest,
   acceptMatchRequest,
@@ -13,6 +14,7 @@ import {
 } from '../services/matchService';
 import { searchClimbers } from '../services/profileService';
 import { ClimberProfile, ClimberMatch, ClimberSearchFilters } from '../types';
+import { getApiErrorMessage, getErrorMessage } from '../utils';
 
 interface MatchState {
   // State
@@ -25,7 +27,7 @@ interface MatchState {
   isLoadingMore: boolean;
   hasMore: boolean;
   error: string | null;
-  lastDoc: unknown;
+  lastDoc: DocumentSnapshot | null;
   filters: ClimberSearchFilters;
   hasAppliedInitialFilters: boolean;
   
@@ -78,13 +80,13 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         set({
           discoveredClimbers: result.data.items,
           hasMore: result.data.hasMore,
-          lastDoc: result.data.lastDoc,
+          lastDoc: result.data.lastDoc as DocumentSnapshot | null,
         });
       } else {
-        set({ error: result.error || 'Failed to fetch climbers' });
+        set({ error: getApiErrorMessage(result, 'Failed to fetch climbers') });
       }
     } catch (error) {
-      set({ error: 'An error occurred while fetching climbers' });
+      set({ error: getErrorMessage(error, 'Failed to fetch climbers') });
     } finally {
       set({ isLoading: false });
     }
@@ -97,17 +99,17 @@ export const useMatchStore = create<MatchState>((set, get) => ({
     set({ isLoadingMore: true });
     
     try {
-      const result = await searchClimbers(userId, filters, lastDoc as any);
+      const result = await searchClimbers(userId, filters, lastDoc);
       
       if (result.success && result.data) {
         set((state) => ({
           discoveredClimbers: [...state.discoveredClimbers, ...result.data!.items],
           hasMore: result.data!.hasMore,
-          lastDoc: result.data!.lastDoc,
+          lastDoc: result.data!.lastDoc as DocumentSnapshot | null,
         }));
       }
     } catch (error) {
-      console.error('Load more climbers error:', error);
+      set({ error: getErrorMessage(error, 'Failed to load more climbers') });
     } finally {
       set({ isLoadingMore: false });
     }
@@ -119,9 +121,11 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       
       if (result.success && result.data) {
         set({ pendingRequests: result.data });
+      } else {
+        set({ error: getApiErrorMessage(result, 'Failed to fetch pending requests') });
       }
     } catch (error) {
-      console.error('Fetch pending requests error:', error);
+      set({ error: getErrorMessage(error, 'Failed to fetch pending requests') });
     }
   },
   
@@ -131,9 +135,11 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       
       if (result.success && result.data) {
         set({ acceptedMatches: result.data });
+      } else {
+        set({ error: getApiErrorMessage(result, 'Failed to fetch accepted matches') });
       }
     } catch (error) {
-      console.error('Fetch accepted matches error:', error);
+      set({ error: getErrorMessage(error, 'Failed to fetch accepted matches') });
     }
   },
   
@@ -143,9 +149,11 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       
       if (result.success && result.data) {
         set({ matchedProfiles: result.data });
+      } else {
+        set({ error: getApiErrorMessage(result, 'Failed to fetch matched profiles') });
       }
     } catch (error) {
-      console.error('Fetch matched profiles error:', error);
+      set({ error: getErrorMessage(error, 'Failed to fetch matched profiles') });
     }
   },
   
@@ -159,9 +167,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         }));
         return true;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to send match request') });
       return false;
     } catch (error) {
-      console.error('Send match request error:', error);
+      set({ error: getErrorMessage(error, 'Failed to send match request') });
       return false;
     }
   },
@@ -176,9 +185,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         }));
         return { success: true, conversationId: result.data?.conversationId };
       }
+      set({ error: getApiErrorMessage(result, 'Failed to accept match request') });
       return { success: false };
     } catch (error) {
-      console.error('Accept match request error:', error);
+      set({ error: getErrorMessage(error, 'Failed to accept match request') });
       return { success: false };
     }
   },
@@ -193,9 +203,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         }));
         return true;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to reject match request') });
       return false;
     } catch (error) {
-      console.error('Reject match request error:', error);
+      set({ error: getErrorMessage(error, 'Failed to reject match request') });
       return false;
     }
   },
@@ -214,9 +225,10 @@ export const useMatchStore = create<MatchState>((set, get) => ({
         }));
         return true;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to unmatch') });
       return false;
     } catch (error) {
-      console.error('Unmatch error:', error);
+      set({ error: getErrorMessage(error, 'Failed to unmatch') });
       return false;
     }
   },
@@ -226,7 +238,7 @@ export const useMatchStore = create<MatchState>((set, get) => ({
       const result = await getMatchStatus(userId, targetUserId);
       return result.data || { status: null, matchId: null };
     } catch (error) {
-      console.error('Check match status error:', error);
+      set({ error: getErrorMessage(error, 'Failed to check match status') });
       return { status: null, matchId: null };
     }
   },

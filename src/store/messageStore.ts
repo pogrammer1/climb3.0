@@ -11,7 +11,8 @@ import {
   getTotalUnreadCount,
 } from '../services/messageService';
 import { Conversation, Message } from '../types';
-import { Unsubscribe } from 'firebase/firestore';
+import { DocumentSnapshot, Unsubscribe } from 'firebase/firestore';
+import { getApiErrorMessage, getErrorMessage } from '../utils';
 
 interface MessageState {
   // State
@@ -23,7 +24,7 @@ interface MessageState {
   isLoadingMessages: boolean;
   isSending: boolean;
   error: string | null;
-  messagesLastDoc: unknown;
+  messagesLastDoc: DocumentSnapshot | null;
   hasMoreMessages: boolean;
   
   // Subscriptions
@@ -70,10 +71,10 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       if (result.success && result.data) {
         set({ conversations: result.data });
       } else {
-        set({ error: result.error || 'Failed to fetch conversations' });
+        set({ error: getApiErrorMessage(result, 'Failed to fetch conversations') });
       }
     } catch (error) {
-      set({ error: 'An error occurred while fetching conversations' });
+      set({ error: getErrorMessage(error, 'Failed to fetch conversations') });
     } finally {
       set({ isLoading: false });
     }
@@ -95,8 +96,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
           totalUnread += userParticipant.unreadCount || 0;
         }
       });
-      
-      console.log('[MessageStore] Total unread count:', totalUnread, 'for user:', userId);
+
       set({ conversations, totalUnreadCount: totalUnread });
     });
     
@@ -122,11 +122,11 @@ export const useMessageStore = create<MessageState>((set, get) => ({
         set({
           messages: result.data.items,
           hasMoreMessages: result.data.hasMore,
-          messagesLastDoc: result.data.lastDoc,
+          messagesLastDoc: result.data.lastDoc as DocumentSnapshot | null,
         });
       }
     } catch (error) {
-      set({ error: 'Failed to open conversation' });
+      set({ error: getErrorMessage(error, 'Failed to open conversation') });
     } finally {
       set({ isLoadingMessages: false });
     }
@@ -149,9 +149,10 @@ export const useMessageStore = create<MessageState>((set, get) => ({
         });
         return result.data;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to start conversation') });
       return null;
     } catch (error) {
-      set({ error: 'Failed to start conversation' });
+      set({ error: getErrorMessage(error, 'Failed to start conversation') });
       return null;
     } finally {
       set({ isLoading: false });
@@ -184,9 +185,10 @@ export const useMessageStore = create<MessageState>((set, get) => ({
         // Message will be added via real-time subscription
         return true;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to send message') });
       return false;
     } catch (error) {
-      console.error('Send message error:', error);
+      set({ error: getErrorMessage(error, 'Failed to send message') });
       return false;
     } finally {
       set({ isSending: false });
@@ -200,17 +202,17 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     set({ isLoadingMessages: true });
     
     try {
-      const result = await getMessages(currentConversation.id, messagesLastDoc as any);
+      const result = await getMessages(currentConversation.id, messagesLastDoc);
       
       if (result.success && result.data) {
         set((state) => ({
           messages: [...result.data!.items, ...state.messages],
           hasMoreMessages: result.data!.hasMore,
-          messagesLastDoc: result.data!.lastDoc,
+          messagesLastDoc: result.data!.lastDoc as DocumentSnapshot | null,
         }));
       }
     } catch (error) {
-      console.error('Load more messages error:', error);
+      set({ error: getErrorMessage(error, 'Failed to load more messages') });
     } finally {
       set({ isLoadingMessages: false });
     }
@@ -218,9 +220,12 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   
   markAsRead: async (conversationId, userId) => {
     try {
-      await markMessagesAsRead(conversationId, userId);
+      const result = await markMessagesAsRead(conversationId, userId);
+      if (!result.success) {
+        set({ error: getApiErrorMessage(result, 'Failed to mark messages as read') });
+      }
     } catch (error) {
-      console.error('Mark as read error:', error);
+      set({ error: getErrorMessage(error, 'Failed to mark messages as read') });
     }
   },
   
@@ -229,7 +234,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       const count = await getTotalUnreadCount(userId);
       set({ totalUnreadCount: count });
     } catch (error) {
-      console.error('Fetch unread count error:', error);
+      set({ error: getErrorMessage(error, 'Failed to fetch unread count') });
     }
   },
   

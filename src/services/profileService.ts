@@ -151,12 +151,8 @@ export const uploadProfilePhoto = async (
   imageUri: string
 ): Promise<ApiResponse<string>> => {
   try {
-    console.log('Starting photo upload for user:', userId);
-    console.log('Image URI type:', imageUri.substring(0, 50) + '...');
-    
     // Convert URI to blob with improved handling
     const blob = await uriToBlob(imageUri);
-    console.log('Blob created, size:', blob.size);
     
     if (blob.size === 0) {
       throw new Error('Image blob is empty');
@@ -170,14 +166,11 @@ export const uploadProfilePhoto = async (
     const metadata = {
       contentType: 'image/jpeg',
     };
-    
-    console.log('Uploading to:', storageRef.fullPath);
+
     await uploadBytes(storageRef, blob, metadata);
-    console.log('Upload complete');
     
     // Get download URL
     const downloadURL = await getDownloadURL(storageRef);
-    console.log('Download URL obtained:', downloadURL.substring(0, 50) + '...');
     
     // Update profile with photo URL
     await updateDoc(doc(db, COLLECTIONS.PROFILES, userId), {
@@ -289,8 +282,6 @@ export const searchClimbers = async (
     
     const querySnapshot = await getDocs(q);
     
-    console.log('Search found', querySnapshot.size, 'profiles');
-    
     let climbers: ClimberProfile[] = [];
     let lastVisible: DocumentSnapshot | null = null;
     
@@ -313,8 +304,6 @@ export const searchClimbers = async (
         lastVisible = docSnap;
       }
     });
-    
-    console.log('After filtering:', climbers.length, 'climbers');
     
     // Apply filters in memory
     if (filters.experienceLevels && filters.experienceLevels.length > 0) {

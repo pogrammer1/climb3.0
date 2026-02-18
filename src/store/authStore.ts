@@ -3,7 +3,8 @@ import { create } from 'zustand';
 import { User as FirebaseUser } from 'firebase/auth';
 import { subscribeToAuthState } from '../services/authService';
 import { getProfile } from '../services/profileService';
-import { User, UserProfile } from '../types';
+import { UserProfile } from '../types';
+import { getApiErrorMessage, getErrorMessage } from '../utils';
 
 interface AuthState {
   // State
@@ -60,9 +61,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const result = await getProfile(user.uid);
       if (result.success && result.data) {
         set({ profile: result.data });
+      } else {
+        set({ error: getApiErrorMessage(result, 'Failed to load profile') });
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      set({ error: getErrorMessage(error, 'Failed to load profile') });
     }
   },
   
@@ -90,9 +93,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const result = await getProfile(firebaseUser.uid);
           if (result.success && result.data) {
             set({ profile: result.data });
+          } else {
+            set({ error: getApiErrorMessage(result, 'Failed to load profile') });
           }
         } catch (error) {
-          console.error('Error fetching profile:', error);
+          set({ error: getErrorMessage(error, 'Failed to load profile') });
         }
       } else {
         set({

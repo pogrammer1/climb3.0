@@ -1,5 +1,6 @@
 // Session Store - Climbing sessions state management
 import { create } from 'zustand';
+import { DocumentSnapshot } from 'firebase/firestore';
 import {
   getUserSessions,
   createSession,
@@ -13,6 +14,7 @@ import {
   getSessionStats,
 } from '../services/sessionService';
 import { ClimbingSession, Climb, SessionFormData, ClimbFormData, SessionFilters } from '../types';
+import { getApiErrorMessage, getErrorMessage } from '../utils';
 
 interface SessionState {
   // State
@@ -31,7 +33,7 @@ interface SessionState {
   isLoadingMore: boolean;
   hasMore: boolean;
   error: string | null;
-  lastDoc: unknown;
+  lastDoc: DocumentSnapshot | null;
   filters: SessionFilters;
   
   // Actions
@@ -81,13 +83,13 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         set({
           sessions: result.data.items,
           hasMore: result.data.hasMore,
-          lastDoc: result.data.lastDoc,
+          lastDoc: result.data.lastDoc as DocumentSnapshot | null,
         });
       } else {
-        set({ error: result.error || 'Failed to fetch sessions' });
+        set({ error: getApiErrorMessage(result, 'Failed to fetch sessions') });
       }
     } catch (error) {
-      set({ error: 'An error occurred while fetching sessions' });
+      set({ error: getErrorMessage(error, 'Failed to fetch sessions') });
     } finally {
       set({ isLoading: false });
     }
@@ -100,17 +102,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ isLoadingMore: true });
     
     try {
-      const result = await getUserSessions(userId, filters, lastDoc as any);
+      const result = await getUserSessions(userId, filters, lastDoc);
       
       if (result.success && result.data) {
         set((state) => ({
           sessions: [...state.sessions, ...result.data!.items],
           hasMore: result.data!.hasMore,
-          lastDoc: result.data!.lastDoc,
+          lastDoc: result.data!.lastDoc as DocumentSnapshot | null,
         }));
       }
     } catch (error) {
-      console.error('Load more sessions error:', error);
+      set({ error: getErrorMessage(error, 'Failed to load more sessions') });
     } finally {
       set({ isLoadingMore: false });
     }
@@ -127,10 +129,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         // Also fetch climbs
         await get().fetchSessionClimbs(sessionId);
       } else {
-        set({ error: result.error || 'Failed to fetch session' });
+        set({ error: getApiErrorMessage(result, 'Failed to fetch session') });
       }
     } catch (error) {
-      set({ error: 'An error occurred while fetching session' });
+      set({ error: getErrorMessage(error, 'Failed to fetch session') });
     } finally {
       set({ isLoading: false });
     }
@@ -142,9 +144,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       
       if (result.success && result.data) {
         set({ currentSessionClimbs: result.data });
+      } else {
+        set({ error: getApiErrorMessage(result, 'Failed to fetch climbs') });
       }
     } catch (error) {
-      console.error('Fetch session climbs error:', error);
+      set({ error: getErrorMessage(error, 'Failed to fetch climbs') });
     }
   },
   
@@ -160,11 +164,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }));
         return result.data;
       } else {
-        set({ error: result.error || 'Failed to create session' });
+        set({ error: getApiErrorMessage(result, 'Failed to create session') });
         return null;
       }
     } catch (error) {
-      set({ error: 'An error occurred while creating session' });
+      set({ error: getErrorMessage(error, 'Failed to create session') });
       return null;
     } finally {
       set({ isLoading: false });
@@ -180,9 +184,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         await get().fetchSession(sessionId);
         return true;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to update session') });
       return false;
     } catch (error) {
-      console.error('Update session error:', error);
+      set({ error: getErrorMessage(error, 'Failed to update session') });
       return false;
     }
   },
@@ -198,9 +203,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }));
         return true;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to delete session') });
       return false;
     } catch (error) {
-      console.error('Delete session error:', error);
+      set({ error: getErrorMessage(error, 'Failed to delete session') });
       return false;
     }
   },
@@ -217,9 +223,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         await get().fetchSession(sessionId);
         return result.data;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to add climb') });
       return null;
     } catch (error) {
-      console.error('Add climb error:', error);
+      set({ error: getErrorMessage(error, 'Failed to add climb') });
       return null;
     }
   },
@@ -249,9 +256,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }));
         return true;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to update climb') });
       return false;
     } catch (error) {
-      console.error('Update climb error:', error);
+      set({ error: getErrorMessage(error, 'Failed to update climb') });
       return false;
     }
   },
@@ -266,9 +274,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         }));
         return true;
       }
+      set({ error: getApiErrorMessage(result, 'Failed to delete climb') });
       return false;
     } catch (error) {
-      console.error('Delete climb error:', error);
+      set({ error: getErrorMessage(error, 'Failed to delete climb') });
       return false;
     }
   },
@@ -279,9 +288,11 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       
       if (result.success && result.data) {
         set({ stats: result.data });
+      } else {
+        set({ error: getApiErrorMessage(result, 'Failed to fetch session stats') });
       }
     } catch (error) {
-      console.error('Fetch stats error:', error);
+      set({ error: getErrorMessage(error, 'Failed to fetch session stats') });
     }
   },
   

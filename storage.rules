@@ -7,6 +7,13 @@ service firebase.storage {
     function isAuthenticated() {
       return request.auth != null;
     }
+
+    // Helper to normalize authenticated user id across token shapes
+    function authUid() {
+      return request.auth.uid != null
+        ? request.auth.uid
+        : (request.auth.token.sub != null ? request.auth.token.sub : request.auth.token.user_id);
+    }
     
     // Helper function to check file size (max 5MB)
     function isValidSize() {
@@ -20,8 +27,9 @@ service firebase.storage {
 
     // Helper function to check if user is in the conversation
     function isConversationParticipant(conversationId) {
-      return isAuthenticated() &&
-             request.auth.uid in firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participantIds;
+          return isAuthenticated() &&
+            firestore.exists(/databases/(default)/documents/conversations/$(conversationId)) &&
+             firestore.get(/databases/(default)/documents/conversations/$(conversationId)).data.participantIds.hasAny([authUid()]);
     }
     
     // Profile photos
@@ -31,30 +39,30 @@ service firebase.storage {
       
       // Only the user can upload their own profile photo
       allow write: if isAuthenticated() && 
-                     request.auth.uid == userId &&
+                     authUid() == userId &&
                      isImage() &&
                      isValidSize();
       
       // Only the user can delete their own profile photo
       allow delete: if isAuthenticated() && 
-                      request.auth.uid == userId;
+                      authUid() == userId;
     }
     
     // Session photos (for climb photos)
     match /session-photos/{userId}/{sessionId}/{fileName} {
       // User can read their own session photos
       allow read: if isAuthenticated() && 
-                    request.auth.uid == userId;
+                    authUid() == userId;
       
       // User can upload photos to their sessions
       allow write: if isAuthenticated() && 
-                     request.auth.uid == userId &&
+                     authUid() == userId &&
                      isImage() &&
                      isValidSize();
       
       // User can delete their session photos
       allow delete: if isAuthenticated() && 
-                      request.auth.uid == userId;
+                      authUid() == userId;
     }
     
     // Chat images (shared in conversations)

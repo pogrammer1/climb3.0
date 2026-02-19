@@ -2,6 +2,7 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendEmailVerification,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
   updateProfile,
@@ -16,6 +17,32 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
 import { User, SignupFormData, LoginFormData, ApiResponse } from '../types';
+import { checkBackoff, checkRateLimit, registerBackoffFailure, resetBackoff } from '../utils';
+
+const PASSWORD_RESET_RATE_LIMIT = {
+  maxAttempts: 3,
+  windowMs: 15 * 60 * 1000,
+};
+
+const VERIFICATION_EMAIL_RATE_LIMIT = {
+  maxAttempts: 3,
+  windowMs: 60 * 60 * 1000,
+};
+
+const SIGN_IN_BACKOFF_CONFIG = {
+  maxFailuresBeforeBackoff: 3,
+  initialBackoffMs: 30 * 1000,
+  maxBackoffMs: 15 * 60 * 1000,
+};
+
+const getRetryDelayText = (retryAfterMs: number): string => {
+  const retryInSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+  if (retryInSeconds >= 60) {
+    const minutes = Math.ceil(retryInSeconds / 60);
+    return `${minutes} minute(s)`;
+  }
+  return `${retryInSeconds} second(s)`;
+};
 
 /**
  * Sign up a new user with email and password
@@ -68,9 +95,21 @@ export const signUp = async (data: SignupFormData): Promise<ApiResponse<User>> =
 export const signIn = async (data: LoginFormData): Promise<ApiResponse<User>> => {
   try {
     const { email, password } = data;
+    const normalizedEmail = email.trim().toLowerCase();
+    const signInBackoffKey = `sign-in:${normalizedEmail}`;
+
+    const backoff = checkBackoff(signInBackoffKey);
+    if (backoff.blocked) {
+      return {
+        success: false,
+        error: `Too many failed sign-in attempts. Please try again in ${getRetryDelayText(backoff.retryAfterMs)}.`,
+      };
+    }
     
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
+
+    resetBackoff(signInBackoffKey);
     
     // Update last login time
     await setDoc(
@@ -96,9 +135,31 @@ export const signIn = async (data: LoginFormData): Promise<ApiResponse<User>> =>
     };
   } catch (error: any) {
     console.error('Sign in error:', error);
+
+    const errorCode = error?.code || '';
+    const credentialFailureCodes = [
+      'auth/invalid-credential',
+      'auth/wrong-password',
+      'auth/user-not-found',
+      'auth/invalid-email',
+    ];
+
+    if (credentialFailureCodes.includes(errorCode)) {
+      const email = data.email.trim().toLowerCase();
+      const signInBackoffKey = `sign-in:${email}`;
+      const backoffResult = registerBackoffFailure(signInBackoffKey, SIGN_IN_BACKOFF_CONFIG);
+
+      if (backoffResult.blocked) {
+        return {
+          success: false,
+          error: `Too many failed sign-in attempts. Please try again in ${getRetryDelayText(backoffResult.retryAfterMs)}.`,
+        };
+      }
+    }
+
     return {
       success: false,
-      error: getAuthErrorMessage(error.code),
+      error: getAuthErrorMessage(errorCode),
     };
   }
 };
@@ -127,6 +188,15 @@ export const signOut = async (): Promise<ApiResponse<null>> => {
  */
 export const resetPassword = async (email: string): Promise<ApiResponse<null>> => {
   try {
+    const rateLimitResult = checkRateLimit(`reset-password:${email.toLowerCase()}`, PASSWORD_RESET_RATE_LIMIT);
+    if (!rateLimitResult.allowed) {
+      const retryMinutes = Math.max(1, Math.ceil(rateLimitResult.retryAfterMs / 60000));
+      return {
+        success: false,
+        error: `Too many password reset attempts. Please wait ${retryMinutes} minute(s).`,
+      };
+    }
+
     await sendPasswordResetEmail(auth, email);
     return {
       success: true,
@@ -134,6 +204,50 @@ export const resetPassword = async (email: string): Promise<ApiResponse<null>> =
     };
   } catch (error: any) {
     console.error('Password reset error:', error);
+    return {
+      success: false,
+      error: getAuthErrorMessage(error.code),
+    };
+  }
+};
+
+/**
+ * Send email verification to current user
+ */
+export const sendVerificationEmail = async (): Promise<ApiResponse<null>> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return {
+        success: false,
+        error: 'No user is currently signed in.',
+      };
+    }
+
+    if (user.emailVerified) {
+      return {
+        success: true,
+        message: 'Email is already verified.',
+      };
+    }
+
+    const rateLimitResult = checkRateLimit(`verify-email:${user.uid}`, VERIFICATION_EMAIL_RATE_LIMIT);
+    if (!rateLimitResult.allowed) {
+      const retryMinutes = Math.max(1, Math.ceil(rateLimitResult.retryAfterMs / 60000));
+      return {
+        success: false,
+        error: `Too many verification email requests. Please wait ${retryMinutes} minute(s).`,
+      };
+    }
+
+    await sendEmailVerification(user);
+
+    return {
+      success: true,
+      message: 'Verification email sent. Please check your inbox.',
+    };
+  } catch (error: any) {
+    console.error('Send verification email error:', error);
     return {
       success: false,
       error: getAuthErrorMessage(error.code),

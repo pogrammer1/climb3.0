@@ -25,6 +25,12 @@ import {
 } from '../types';
 import { getOrCreateConversation } from './messageService';
 import { getProfile } from './profileService';
+import { checkRateLimit } from '../utils';
+
+const MATCH_REQUEST_RATE_LIMIT = {
+  maxAttempts: 5,
+  windowMs: 60 * 60 * 1000,
+};
 
 /**
  * Send a match request to another climber
@@ -34,6 +40,15 @@ export const sendMatchRequest = async (
   targetUserId: string
 ): Promise<ApiResponse<ClimberMatch>> => {
   try {
+    const rateLimitResult = checkRateLimit(`match-request:${userId}`, MATCH_REQUEST_RATE_LIMIT);
+    if (!rateLimitResult.allowed) {
+      const retryMinutes = Math.max(1, Math.ceil(rateLimitResult.retryAfterMs / 60000));
+      return {
+        success: false,
+        error: `Too many match requests. Please wait ${retryMinutes} minute(s) before trying again.`,
+      };
+    }
+
     // Check if match already exists
     const existingMatch = await getExistingMatch(userId, targetUserId);
     if (existingMatch) {

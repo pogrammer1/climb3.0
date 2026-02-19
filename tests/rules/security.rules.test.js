@@ -14,6 +14,7 @@ const TEXT_DATA_URL = 'data:text/plain;base64,bm90LWFuLWltYWdl';
 
 describe('Security rules', () => {
   let testEnv;
+  const authedContext = (uid) => testEnv.authenticatedContext(uid);
 
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
@@ -114,8 +115,8 @@ describe('Security rules', () => {
   });
 
   test('potentialMatches: only owner can read/write own document', async () => {
-    const u1Db = testEnv.authenticatedContext('u1').firestore();
-    const u2Db = testEnv.authenticatedContext('u2').firestore();
+    const u1Db = authedContext('u1').firestore();
+    const u2Db = authedContext('u2').firestore();
 
     await assertSucceeds(getDoc(doc(u1Db, 'potentialMatches', 'pm_u1')));
     await assertFails(getDoc(doc(u2Db, 'potentialMatches', 'pm_u1')));
@@ -172,7 +173,7 @@ describe('Security rules', () => {
   });
 
   test('matches: immutable ownership fields cannot be changed', async () => {
-    const u1Db = testEnv.authenticatedContext('u1').firestore();
+    const u1Db = authedContext('u1').firestore();
 
     await assertSucceeds(
       updateDoc(doc(u1Db, 'matches', 'match_u1_u2'), {
@@ -188,7 +189,7 @@ describe('Security rules', () => {
   });
 
   test('messages: participant can update readBy but cannot modify message content/sender', async () => {
-    const u2Db = testEnv.authenticatedContext('u2').firestore();
+    const u2Db = authedContext('u2').firestore();
 
     await assertSucceeds(
       updateDoc(doc(u2Db, 'conversations', 'conv_u1_u2', 'messages', 'msg1'), {

@@ -220,6 +220,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
 
   const handleSendRequest = async (targetUserId: string) => {
     if (!user) return;
+
     setSendingRequestTo(targetUserId);
     try {
       const success = await sendRequest(user.uid, targetUserId);
@@ -242,6 +243,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
 
   const handleMessageUser = async (otherUserId: string, otherUserName: string, otherUserPhoto: string | null) => {
     if (!user) return;
+
     try {
       const result = await getOrCreateConversation(user.uid, otherUserId, otherUserName, otherUserPhoto);
       if (result.success && result.data) {

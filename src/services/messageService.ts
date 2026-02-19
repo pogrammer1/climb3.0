@@ -25,6 +25,12 @@ import {
   ApiResponse,
   PaginatedResponse,
 } from '../types';
+import { checkRateLimit } from '../utils';
+
+const MESSAGE_SEND_RATE_LIMIT = {
+  maxAttempts: 12,
+  windowMs: 10_000,
+};
 
 /**
  * Create or get existing conversation between two users
@@ -187,6 +193,15 @@ export const sendMessage = async (
   imageUrl?: string
 ): Promise<ApiResponse<Message>> => {
   try {
+    const rateLimitResult = checkRateLimit(`message-send:${senderId}`, MESSAGE_SEND_RATE_LIMIT);
+    if (!rateLimitResult.allowed) {
+      const retrySeconds = Math.max(1, Math.ceil(rateLimitResult.retryAfterMs / 1000));
+      return {
+        success: false,
+        error: `You're sending messages too quickly. Try again in ${retrySeconds}s.`,
+      };
+    }
+
     const messagesRef = collection(
       db,
       COLLECTIONS.CONVERSATIONS,

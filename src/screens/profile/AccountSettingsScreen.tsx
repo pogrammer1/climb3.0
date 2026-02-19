@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button } from '../../components/common';
 import { useAuthStore } from '../../store';
 import { showAlert } from '../../utils/alert';
+import { sendVerificationEmail } from '../../services/authService';
 
 interface AccountSettingsScreenProps {
   navigation: any;
@@ -48,6 +49,15 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
         },
       ]
     );
+  };
+
+  const handleSendVerificationEmail = async () => {
+    const result = await sendVerificationEmail();
+    if (result.success) {
+      showAlert('Verification Email', result.message || 'Verification email sent.');
+    } else {
+      showAlert('Could Not Send Email', result.error || 'Failed to send verification email.');
+    }
   };
 
   return (
@@ -119,6 +129,16 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
             right={(props) => <List.Icon {...props} icon="chevron-right" />}
             onPress={handleChangePassword}
           />
+
+          {!user?.emailVerified && (
+            <List.Item
+              title="Verify Email"
+              description="Required for discovery and messaging"
+              left={(props) => <List.Icon {...props} icon="email-check-outline" />}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={handleSendVerificationEmail}
+            />
+          )}
         </Card>
 
         {/* Danger Zone */}

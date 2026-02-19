@@ -14,7 +14,7 @@ service cloud.firestore {
         ? request.auth.uid
         : (request.auth.token.sub != null ? request.auth.token.sub : request.auth.token.user_id);
     }
-    
+
     // Helper function to check if user owns the resource
     function isOwner(userId) {
       return isAuthenticated() && authUid() == userId;
@@ -147,7 +147,7 @@ service cloud.firestore {
     // Conversations collection
     match /conversations/{conversationId} {
       // Participants can read the conversation
-      allow read: if isParticipant(resource.data);
+      allow read: if isAuthenticated() && isParticipant(resource.data);
       
       // Authenticated users can create conversations
       allow create: if isAuthenticated() && 
@@ -163,7 +163,7 @@ service cloud.firestore {
                       ]);
       
       // Participants can update conversation (e.g., read receipts)
-      allow update: if isParticipant(resource.data) &&
+      allow update: if isAuthenticated() && isParticipant(resource.data) &&
                       request.resource.data.participantIds == resource.data.participantIds &&
                       request.resource.data.createdAt == resource.data.createdAt &&
                       request.resource.data.keys().hasOnly([
@@ -176,7 +176,7 @@ service cloud.firestore {
                       ]);
       
       // Participants can delete conversation
-      allow delete: if isParticipant(resource.data);
+      allow delete: if isAuthenticated() && isParticipant(resource.data);
       
       // Messages subcollection
       match /messages/{messageId} {

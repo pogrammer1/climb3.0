@@ -28,6 +28,7 @@ import {
   PaginatedResponse,
   SessionFilters,
 } from '../types';
+import { logServiceError } from '../utils/error';
 
 /**
  * Create a new climbing session
@@ -65,7 +66,7 @@ export const createSession = async (
       message: 'Session created successfully',
     };
   } catch (error: any) {
-    console.error('Create session error:', error);
+    logServiceError('SessionService.createSession', error);
     return {
       success: false,
       error: 'Failed to create session',
@@ -102,7 +103,7 @@ export const getSession = async (sessionId: string): Promise<ApiResponse<Climbin
       data: session,
     };
   } catch (error: any) {
-    console.error('Get session error:', error);
+    logServiceError('SessionService.getSession', error);
     return {
       success: false,
       error: 'Failed to fetch session',
@@ -170,7 +171,7 @@ export const getUserSessions = async (
       },
     };
   } catch (error: any) {
-    console.error('Get user sessions error:', error);
+    logServiceError('SessionService.getUserSessions', error);
     return {
       success: false,
       error: 'Failed to fetch sessions',
@@ -204,7 +205,7 @@ export const updateSession = async (
       message: 'Session updated',
     };
   } catch (error: any) {
-    console.error('Update session error:', error);
+    logServiceError('SessionService.updateSession', error);
     return {
       success: false,
       error: 'Failed to update session',
@@ -240,7 +241,7 @@ export const deleteSession = async (sessionId: string): Promise<ApiResponse<null
       message: 'Session deleted',
     };
   } catch (error: any) {
-    console.error('Delete session error:', error);
+    logServiceError('SessionService.deleteSession', error);
     return {
       success: false,
       error: 'Failed to delete session',
@@ -288,7 +289,7 @@ export const addClimb = async (
       message: 'Climb added',
     };
   } catch (error: any) {
-    console.error('Add climb error:', error);
+    logServiceError('SessionService.addClimb', error);
     return {
       success: false,
       error: 'Failed to add climb',
@@ -324,7 +325,7 @@ export const getSessionClimbs = async (
       data: climbs,
     };
   } catch (error: any) {
-    console.error('Get session climbs error:', error);
+    logServiceError('SessionService.getSessionClimbs', error);
     return {
       success: false,
       error: 'Failed to fetch climbs',
@@ -354,7 +355,7 @@ export const updateClimb = async (
       message: 'Climb updated',
     };
   } catch (error: any) {
-    console.error('Update climb error:', error);
+    logServiceError('SessionService.updateClimb', error);
     return {
       success: false,
       error: 'Failed to update climb',
@@ -374,7 +375,7 @@ export const deleteClimb = async (climbId: string): Promise<ApiResponse<null>> =
       message: 'Climb deleted',
     };
   } catch (error: any) {
-    console.error('Delete climb error:', error);
+    logServiceError('SessionService.deleteClimb', error);
     return {
       success: false,
       error: 'Failed to delete climb',
@@ -415,7 +416,7 @@ export const uploadSessionPhoto = async (
       message: 'Photo uploaded',
     };
   } catch (error: any) {
-    console.error('Upload session photo error:', error);
+    logServiceError('SessionService.uploadSessionPhoto', error);
     return {
       success: false,
       error: 'Failed to upload photo',
@@ -498,7 +499,7 @@ export const getSessionStats = async (
       },
     };
   } catch (error: any) {
-    console.error('Get session stats error:', error);
+    logServiceError('SessionService.getSessionStats', error);
     return {
       success: false,
       error: 'Failed to fetch statistics',

@@ -1,4 +1,5 @@
 // Notification Service - Handles browser/push notifications
+import { logServiceError } from '../utils/error';
 
 /**
  * Check if browser notifications are supported
@@ -30,7 +31,7 @@ export const requestNotificationPermission = async (): Promise<NotificationPermi
     const permission = await Notification.requestPermission();
     return permission;
   } catch (error) {
-    console.error('Error requesting notification permission:', error);
+    logServiceError('NotificationService.requestNotificationPermission', error);
     return 'denied';
   }
 };
@@ -81,7 +82,7 @@ export const showNotification = (
     
     return notification;
   } catch (error) {
-    console.error('Error showing notification:', error);
+    logServiceError('NotificationService.showNotification', error);
     return null;
   }
 };

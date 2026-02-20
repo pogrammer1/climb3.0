@@ -26,6 +26,7 @@ import {
   PaginatedResponse,
 } from '../types';
 import { checkRateLimit } from '../utils';
+import { logServiceError } from '../utils/error';
 
 const MESSAGE_SEND_RATE_LIMIT = {
   maxAttempts: 12,
@@ -94,7 +95,7 @@ export const getOrCreateConversation = async (
       message: 'Conversation created',
     };
   } catch (error: any) {
-    console.error('Get or create conversation error:', error);
+    logServiceError('MessageService.getOrCreateConversation', error);
     return {
       success: false,
       error: 'Failed to get or create conversation',
@@ -136,7 +137,7 @@ export const findExistingConversation = async (
       updatedAt: data.updatedAt?.toDate() || new Date(),
     } as unknown as Conversation;
   } catch (error) {
-    console.error('Find existing conversation error:', error);
+    logServiceError('MessageService.findExistingConversation', error);
     return null;
   }
 };
@@ -175,7 +176,7 @@ export const getUserConversations = async (
       data: conversations,
     };
   } catch (error: any) {
-    console.error('Get user conversations error:', error);
+    logServiceError('MessageService.getUserConversations', error);
     return {
       success: false,
       error: 'Failed to fetch conversations',
@@ -254,7 +255,7 @@ export const sendMessage = async (
       message: 'Message sent',
     };
   } catch (error: any) {
-    console.error('Send message error:', error);
+    logServiceError('MessageService.sendMessage', error);
     return {
       success: false,
       error: 'Failed to send message',
@@ -304,7 +305,7 @@ export const getMessages = async (
       },
     };
   } catch (error: any) {
-    console.error('Get messages error:', error);
+    logServiceError('MessageService.getMessages', error);
     return {
       success: false,
       error: 'Failed to fetch messages',
@@ -369,7 +370,7 @@ export const markMessagesAsRead = async (
       message: 'Messages marked as read',
     };
   } catch (error: any) {
-    console.error('Mark messages as read error:', error);
+    logServiceError('MessageService.markMessagesAsRead', error);
     return {
       success: false,
       error: 'Failed to mark messages as read',
@@ -471,7 +472,7 @@ export const getTotalUnreadCount = async (userId: string): Promise<number> => {
     
     return totalUnread;
   } catch (error) {
-    console.error('Get total unread count error:', error);
+    logServiceError('MessageService.getTotalUnreadCount', error);
     return 0;
   }
 };
@@ -494,7 +495,7 @@ export const deleteConversation = async (
       message: 'Conversation deleted',
     };
   } catch (error: any) {
-    console.error('Delete conversation error:', error);
+    logServiceError('MessageService.deleteConversation', error);
     return {
       success: false,
       error: 'Failed to delete conversation',

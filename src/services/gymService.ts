@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
+import { logServiceError } from '../utils/error';
 
 // Types
 export interface Gym {
@@ -100,7 +101,7 @@ export const getGymNamesByCity = async (city: string): Promise<string[]> => {
 
     return gymNames;
   } catch (error) {
-    console.error('Error getting gyms by city:', error);
+    logServiceError('GymService.getGymNamesByCity', error);
     return [];
   }
 };
@@ -136,7 +137,7 @@ export const searchGyms = async (
     
     return localResults;
   } catch (error) {
-    console.error('Error searching gyms:', error);
+    logServiceError('GymService.searchGyms', error);
     return [];
   }
 };
@@ -178,7 +179,7 @@ export const searchLocalGyms = async (
       gym.address.toLowerCase().includes(lowerQuery)
     );
   } catch (error) {
-    console.error('Error searching local gyms:', error);
+    logServiceError('GymService.searchLocalGyms', error);
     return [];
   }
 };
@@ -208,7 +209,7 @@ export const searchGooglePlaces = async (
       return await searchWithRestAPI(searchTerm, locationType, userLocation, apiKey);
     }
   } catch (error) {
-    console.error('Error searching Google Places:', error);
+    logServiceError('GymService.searchGooglePlaces', error);
     return [];
   }
 };
@@ -325,11 +326,15 @@ const searchWithJavaScriptAPI = async (
         if (newApiError?.message?.includes('ExpiredKey') || 
             newApiError?.message?.includes('InvalidKey') ||
             newApiError?.message?.includes('API key')) {
-          console.error('Google Maps API key issue:', newApiError.message);
+          if (__DEV__) {
+            console.warn('Google Maps API key issue');
+          }
           // Don't fall back, just return empty results since the key is invalid
           return [];
         }
-        console.warn('New Places API error, falling back to legacy:', newApiError);
+        if (__DEV__) {
+          console.warn('New Places API error, falling back to legacy');
+        }
         // Fall through to legacy API
       }
     }
@@ -377,9 +382,11 @@ const searchWithJavaScriptAPI = async (
     if (error?.message?.includes('ExpiredKey') || 
         error?.message?.includes('InvalidKey') ||
         error?.message?.includes('API key')) {
-      console.error('Google Maps API key issue:', error.message);
+      if (__DEV__) {
+        console.warn('Google Maps API key issue');
+      }
     } else {
-      console.error('Error with JavaScript API:', error);
+      logServiceError('GymService.searchWithJavaScriptAPI', error);
     }
     return [];
   }
@@ -439,7 +446,7 @@ export const getPlaceDetails = async (
       return await getPlaceDetailsWithRestAPI(placeId, apiKey);
     }
   } catch (error) {
-    console.error('Error getting place details:', error);
+    logServiceError('GymService.getPlaceDetails', error);
     return null;
   }
 };
@@ -484,7 +491,9 @@ const getPlaceDetailsWithJavaScriptAPI = async (
           } : undefined,
         };
       } catch (newApiError) {
-        console.warn('New Place API error, falling back to legacy:', newApiError);
+        if (__DEV__) {
+          console.warn('New Place API error, falling back to legacy');
+        }
         // Fall through to legacy API
       }
     }
@@ -522,7 +531,7 @@ const getPlaceDetailsWithJavaScriptAPI = async (
       );
     });
   } catch (error) {
-    console.error('Error with JavaScript API place details:', error);
+    logServiceError('GymService.getPlaceDetailsWithJavaScriptAPI', error);
     return null;
   }
 };
@@ -625,7 +634,7 @@ export const saveGymToDatabase = async (
       updatedAt: new Date(),
     } as Gym;
   } catch (error) {
-    console.error('Error saving gym:', error);
+    logServiceError('GymService.saveGymToDatabase', error);
     return null;
   }
 };
@@ -651,7 +660,7 @@ export const updateGymCoordinates = async (
     await setDoc(gymRef, updateData, { merge: true });
     console.log('Updated gym coordinates:', gymId, location);
   } catch (error) {
-    console.error('Error updating gym coordinates:', error);
+    logServiceError('GymService.updateGymCoordinates', error);
   }
 };
 
@@ -673,7 +682,7 @@ export const getGymByPlaceId = async (placeId: string): Promise<Gym | null> => {
       ...snapshot.docs[0].data(),
     } as Gym;
   } catch (error) {
-    console.error('Error getting gym by placeId:', error);
+    logServiceError('GymService.getGymByPlaceId', error);
     return null;
   }
 };
@@ -694,7 +703,7 @@ export const incrementGymSessionCount = async (gymId: string): Promise<void> => 
       }, { merge: true });
     }
   } catch (error) {
-    console.error('Error incrementing session count:', error);
+    logServiceError('GymService.incrementGymSessionCount', error);
   }
 };
 
@@ -720,7 +729,7 @@ export const getPopularGyms = async (
       ...doc.data(),
     })) as Gym[];
   } catch (error) {
-    console.error('Error getting popular gyms:', error);
+    logServiceError('GymService.getPopularGyms', error);
     return [];
   }
 };

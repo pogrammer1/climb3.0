@@ -22,6 +22,7 @@ import {
   DayOfWeek,
 } from '../types';
 import { getProfile } from './profileService';
+import { logServiceError } from '../utils/error';
 
 /**
  * Get a user's weekly schedule
@@ -65,7 +66,7 @@ export const getSchedule = async (userId: string): Promise<ApiResponse<WeeklySch
       data: schedule,
     };
   } catch (error: any) {
-    console.error('Get schedule error:', error);
+    logServiceError('ScheduleService.getSchedule', error);
     return {
       success: false,
       error: 'Failed to fetch schedule',
@@ -100,7 +101,7 @@ export const saveSchedule = async (
 
     return await getSchedule(userId);
   } catch (error: any) {
-    console.error('Save schedule error:', error);
+    logServiceError('ScheduleService.saveSchedule', error);
     return {
       success: false,
       error: 'Failed to save schedule',
@@ -139,7 +140,7 @@ export const toggleDayAvailability = async (
       currentSchedule.data.notes
     );
   } catch (error: any) {
-    console.error('Toggle day availability error:', error);
+    logServiceError('ScheduleService.toggleDayAvailability', error);
     return {
       success: false,
       error: 'Failed to update availability',
@@ -283,7 +284,7 @@ export const getConnectionScheduleMatches = async (
           });
         }
       } catch (error) {
-        console.error(`Error fetching schedule for connection ${connectionId}:`, error);
+        logServiceError('ScheduleService.getConnectionScheduleMatches.connectionFetch', error);
         // Continue with other connections
       }
     }
@@ -296,7 +297,7 @@ export const getConnectionScheduleMatches = async (
       data: matches,
     };
   } catch (error: any) {
-    console.error('Get connection schedule matches error:', error);
+    logServiceError('ScheduleService.getConnectionScheduleMatches', error);
     return {
       success: false,
       error: 'Failed to fetch schedule matches',

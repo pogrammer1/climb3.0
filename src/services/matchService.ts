@@ -4,7 +4,6 @@ import {
   collection,
   getDoc,
   getDocs,
-  addDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -15,7 +14,8 @@ import {
   and,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, db } from '../config/firebase';
 import { COLLECTIONS, MATCH_STATUS } from '../constants';
 import {
   ClimberMatch,
@@ -25,11 +25,20 @@ import {
 } from '../types';
 import { getOrCreateConversation } from './messageService';
 import { getProfile } from './profileService';
-import { checkRateLimit } from '../utils';
+import { logServiceError } from '../utils/error';
 
-const MATCH_REQUEST_RATE_LIMIT = {
-  maxAttempts: 5,
-  windowMs: 60 * 60 * 1000,
+type SendMatchRequestCallableData = {
+  targetUserId: string;
+};
+
+type SendMatchRequestCallableResult = {
+  id: string;
+  userId: string;
+  matchedUserId: string;
+  status: string;
+  initiatedBy: string;
+  createdAt: number;
+  updatedAt: number;
 };
 
 /**
@@ -40,49 +49,54 @@ export const sendMatchRequest = async (
   targetUserId: string
 ): Promise<ApiResponse<ClimberMatch>> => {
   try {
-    const rateLimitResult = checkRateLimit(`match-request:${userId}`, MATCH_REQUEST_RATE_LIMIT);
-    if (!rateLimitResult.allowed) {
-      const retryMinutes = Math.max(1, Math.ceil(rateLimitResult.retryAfterMs / 60000));
+    const functions = getFunctions(app, 'us-central1');
+    const callable = httpsCallable<SendMatchRequestCallableData, SendMatchRequestCallableResult>(
+      functions,
+      'sendMatchRequest'
+    );
+
+    const callableResult = await callable({ targetUserId });
+    const resultData = callableResult.data;
+
+    if (!resultData?.id) {
+      return {
+        success: false,
+        error: 'Failed to send match request',
+      };
+    }
+    
+    return {
+      success: true,
+      data: {
+        id: resultData.id,
+        userId: resultData.userId,
+        matchedUserId: resultData.matchedUserId,
+        status: resultData.status as ClimberMatch['status'],
+        initiatedBy: resultData.initiatedBy,
+        createdAt: new Date(resultData.createdAt),
+        updatedAt: new Date(resultData.updatedAt),
+      } as ClimberMatch,
+      message: 'Match request sent',
+    };
+  } catch (error: any) {
+    const errorCode = error?.code as string | undefined;
+    if (errorCode === 'functions/already-exists') {
+      return {
+        success: false,
+        error: 'A match request already exists with this climber',
+      };
+    }
+
+    if (errorCode === 'functions/resource-exhausted') {
+      const retryAfterMs = Number(error?.details?.retryAfterMs || 0);
+      const retryMinutes = Math.max(1, Math.ceil(retryAfterMs / 60000));
       return {
         success: false,
         error: `Too many match requests. Please wait ${retryMinutes} minute(s) before trying again.`,
       };
     }
 
-    // Check if match already exists
-    const existingMatch = await getExistingMatch(userId, targetUserId);
-    if (existingMatch) {
-      return {
-        success: false,
-        error: 'A match request already exists with this climber',
-      };
-    }
-    
-    const matchesRef = collection(db, COLLECTIONS.MATCHES);
-    
-    const newMatch = {
-      userId,
-      matchedUserId: targetUserId,
-      status: MATCH_STATUS.PENDING,
-      initiatedBy: userId,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-    
-    const docRef = await addDoc(matchesRef, newMatch);
-    
-    return {
-      success: true,
-      data: {
-        id: docRef.id,
-        ...newMatch,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as ClimberMatch,
-      message: 'Match request sent',
-    };
-  } catch (error: any) {
-    console.error('Send match request error:', error);
+    logServiceError('MatchService.sendMatchRequest', error);
     return {
       success: false,
       error: 'Failed to send match request',
@@ -145,7 +159,7 @@ export const acceptMatchRequest = async (
       message: 'Match request accepted',
     };
   } catch (error: any) {
-    console.error('Accept match error:', error);
+    logServiceError('MatchService.acceptMatchRequest', error);
     return {
       success: false,
       error: 'Failed to accept match request',
@@ -172,7 +186,7 @@ export const rejectMatchRequest = async (
       message: 'Match request rejected',
     };
   } catch (error: any) {
-    console.error('Reject match error:', error);
+    logServiceError('MatchService.rejectMatchRequest', error);
     return {
       success: false,
       error: 'Failed to reject match request',
@@ -192,7 +206,7 @@ export const removeMatch = async (matchId: string): Promise<ApiResponse<null>> =
       message: 'Match removed',
     };
   } catch (error: any) {
-    console.error('Remove match error:', error);
+    logServiceError('MatchService.removeMatch', error);
     return {
       success: false,
       error: 'Failed to remove match',
@@ -232,7 +246,7 @@ export const getPendingRequests = async (
       data: requests,
     };
   } catch (error: any) {
-    console.error('Get pending requests error:', error);
+    logServiceError('MatchService.getPendingRequests', error);
     return {
       success: false,
       error: 'Failed to fetch pending requests',
@@ -273,7 +287,7 @@ export const getSentRequests = async (
       data: requests,
     };
   } catch (error: any) {
-    console.error('Get sent requests error:', error);
+    logServiceError('MatchService.getSentRequests', error);
     return {
       success: false,
       error: 'Failed to fetch sent requests',
@@ -318,7 +332,7 @@ export const getAcceptedMatches = async (
       data: matches,
     };
   } catch (error: any) {
-    console.error('Get accepted matches error:', error);
+    logServiceError('MatchService.getAcceptedMatches', error);
     return {
       success: false,
       error: 'Failed to fetch matches',
@@ -366,7 +380,7 @@ export const getMatchedProfiles = async (
       data: profiles,
     };
   } catch (error: any) {
-    console.error('Get matched profiles error:', error);
+    logServiceError('MatchService.getMatchedProfiles', error);
     return {
       success: false,
       error: 'Failed to fetch matched profiles',
@@ -410,7 +424,7 @@ export const getExistingMatch = async (
     
     return null;
   } catch (error) {
-    console.error('Get existing match error:', error);
+    logServiceError('MatchService.getExistingMatch', error);
     return null;
   }
 };
@@ -438,7 +452,7 @@ export const getMatchStatus = async (
       },
     };
   } catch (error: any) {
-    console.error('Get match status error:', error);
+    logServiceError('MatchService.getMatchStatus', error);
     return {
       success: false,
       error: 'Failed to get match status',

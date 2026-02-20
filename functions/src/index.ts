@@ -16,7 +16,7 @@ import {
   QueryDocumentSnapshot,
   Change,
 } from "firebase-functions/v2/firestore";
-import { onRequest } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
@@ -39,6 +39,165 @@ const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587", 10);
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_PASS = process.env.SMTP_PASS || "";
 const FROM_EMAIL = process.env.FROM_EMAIL || "";
+
+const MATCH_REQUEST_RATE_LIMIT = {
+  maxRequests: 5,
+  windowMs: 60 * 60 * 1000,
+};
+
+const RATE_LIMITS_COLLECTION = "securityRateLimits";
+
+type SendMatchRequestData = {
+  targetUserId?: string;
+};
+
+type SendMatchRequestResult = {
+  id: string;
+  userId: string;
+  matchedUserId: string;
+  status: string;
+  initiatedBy: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+async function enforceRateLimit(
+  userId: string,
+  action: string,
+  maxRequests: number,
+  windowMs: number
+): Promise<void> {
+  const now = Date.now();
+  const rateLimitId = `${action}:${userId}`;
+  const rateLimitRef = db.collection(RATE_LIMITS_COLLECTION).doc(rateLimitId);
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(rateLimitRef);
+
+    if (!snapshot.exists) {
+      transaction.set(rateLimitRef, {
+        action,
+        userId,
+        count: 1,
+        windowStartMs: now,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    const data = snapshot.data() || {};
+    const currentCount = typeof data.count === "number" ? data.count : 0;
+    const windowStartMs = typeof data.windowStartMs === "number" ? data.windowStartMs : now;
+    const isWindowExpired = now - windowStartMs >= windowMs;
+
+    if (isWindowExpired) {
+      transaction.update(rateLimitRef, {
+        count: 1,
+        windowStartMs: now,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return;
+    }
+
+    if (currentCount >= maxRequests) {
+      const retryAfterMs = Math.max(windowMs - (now - windowStartMs), 0);
+      throw new HttpsError(
+        "resource-exhausted",
+        "Too many match requests. Please try again later.",
+        {retryAfterMs}
+      );
+    }
+
+    transaction.update(rateLimitRef, {
+      count: currentCount + 1,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Promise<SendMatchRequestResult> => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "You must be signed in to send match requests.");
+  }
+
+  const userId = request.auth.uid;
+  const targetUserId = request.data?.targetUserId?.trim();
+
+  if (!targetUserId) {
+    throw new HttpsError("invalid-argument", "targetUserId is required.");
+  }
+
+  if (targetUserId === userId) {
+    throw new HttpsError("invalid-argument", "You cannot send a match request to yourself.");
+  }
+
+  try {
+    await enforceRateLimit(
+      userId,
+      "sendMatchRequest",
+      MATCH_REQUEST_RATE_LIMIT.maxRequests,
+      MATCH_REQUEST_RATE_LIMIT.windowMs
+    );
+
+    const profilesRef = db.collection("profiles");
+    const targetProfile = await profilesRef.doc(targetUserId).get();
+    if (!targetProfile.exists) {
+      throw new HttpsError("not-found", "Target user profile was not found.");
+    }
+
+    const matchesRef = db.collection("matches");
+    const [directMatchSnap, reverseMatchSnap] = await Promise.all([
+      matchesRef
+        .where("userId", "==", userId)
+        .where("matchedUserId", "==", targetUserId)
+        .limit(1)
+        .get(),
+      matchesRef
+        .where("userId", "==", targetUserId)
+        .where("matchedUserId", "==", userId)
+        .limit(1)
+        .get(),
+    ]);
+
+    if (!directMatchSnap.empty || !reverseMatchSnap.empty) {
+      throw new HttpsError("already-exists", "A match request already exists with this climber.");
+    }
+
+    const nowMs = Date.now();
+    const matchData = {
+      userId,
+      matchedUserId: targetUserId,
+      status: "pending",
+      initiatedBy: userId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const matchRef = await matchesRef.add(matchData);
+
+    return {
+      id: matchRef.id,
+      userId,
+      matchedUserId: targetUserId,
+      status: "pending",
+      initiatedBy: userId,
+      createdAt: nowMs,
+      updatedAt: nowMs,
+    };
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+
+    logger.error("sendMatchRequest callable failed", {
+      code: (error as { code?: string })?.code,
+      message: (error as { message?: string })?.message || "Unknown error",
+      uid: userId,
+    });
+
+    throw new HttpsError("internal", "Failed to send match request.");
+  }
+});
 
 /**
  * Create nodemailer transporter

@@ -1,9 +1,11 @@
 // Firebase Configuration
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
 import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, connectStorageEmulator } from 'firebase/storage';
+import { Platform } from 'react-native';
 
 // Firebase configuration object
 // Values are loaded from environment variables (.env file)
@@ -30,6 +32,7 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
+let appCheck: AppCheck | null = null;
 
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
@@ -41,6 +44,37 @@ auth = getAuth(app);
 db = getFirestore(app);
 storage = getStorage(app);
 
+const appCheckSiteKey = process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_WEB_RECAPTCHA_SITE_KEY;
+const appCheckDebugToken = process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN;
+
+if (Platform.OS === 'web') {
+  if (appCheckDebugToken && typeof globalThis !== 'undefined') {
+    (globalThis as typeof globalThis & { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
+      appCheckDebugToken;
+  }
+
+  if (appCheckSiteKey) {
+    try {
+      appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(appCheckSiteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('Firebase App Check initialization failed on web:', error);
+      }
+    }
+  } else {
+    if (__DEV__) {
+      console.warn('Missing App Check site key: EXPO_PUBLIC_FIREBASE_APPCHECK_WEB_RECAPTCHA_SITE_KEY');
+    }
+  }
+} else {
+  if (__DEV__) {
+    console.warn('Firebase App Check native enforcement requires a native provider integration for Expo builds.');
+  }
+}
+
 // Connect to emulators in development (uncomment when using local emulators)
 // if (__DEV__) {
 //   connectAuthEmulator(auth, 'http://localhost:9099');
@@ -48,5 +82,5 @@ storage = getStorage(app);
 //   connectStorageEmulator(storage, 'localhost', 9199);
 // }
 
-export { app, auth, db, storage };
+export { app, auth, db, storage, appCheck };
 export default app;

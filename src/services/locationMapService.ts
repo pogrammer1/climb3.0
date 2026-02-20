@@ -12,6 +12,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
 import { ClimbingSession } from '../types';
+import { logServiceError } from '../utils/error';
 
 // Types for visited locations
 export interface VisitedLocation {
@@ -32,12 +33,18 @@ const geocodeCache: Map<string, { latitude: number; longitude: number } | null> 
 // Cloud Function URL for geocoding (avoids CORS issues)
 const GEOCODE_FUNCTION_URL = 'https://us-central1-belay-91a94.cloudfunctions.net/geocodeLocation';
 
+const logDebug = (...args: unknown[]) => {
+  if (__DEV__) {
+    console.log(...args);
+  }
+};
+
 /**
  * Clear the geocode cache (useful when fixing bad coordinates)
  */
 export const clearGeocodeCache = () => {
   geocodeCache.clear();
-  console.log('Geocode cache cleared');
+  logDebug('Geocode cache cleared');
 };
 
 /**
@@ -82,7 +89,7 @@ export const geocodeLocation = async (locationName: string): Promise<{ latitude:
     geocodeCache.set(locationName.toLowerCase(), null);
     return null;
   } catch (error) {
-    console.error('Geocoding error for', locationName, error);
+    logServiceError('LocationMapService.geocodeLocation', error);
     geocodeCache.set(locationName.toLowerCase(), null);
     return null;
   }
@@ -122,7 +129,9 @@ export const getVisitedLocations = async (userId: string): Promise<VisitedLocati
     
     for (const session of sessions) {
       if (!session.location) {
-        console.warn('Session missing location field:', session.id, session);
+        if (__DEV__) {
+          console.warn('Session missing location field');
+        }
         continue; // skip this session
       }
       const key = session.location.toLowerCase().trim();
@@ -151,15 +160,17 @@ export const getVisitedLocations = async (userId: string): Promise<VisitedLocati
     }>();
     
     // Log all gyms for debugging
-    console.log('=== All gyms in database ===');
+    logDebug('=== All gyms in database ===');
     gymsSnapshot.forEach(docSnap => {
       const data = docSnap.data();
       if (!data.name) {
-        console.warn('Gym missing name field:', docSnap.id, data);
+        if (__DEV__) {
+          console.warn('Gym missing name field');
+        }
         return; // skip this gym
       }
       const key = data.name.toLowerCase().trim();
-      console.log(`Gym: "${data.name}" -> key: "${key}", city: "${data.city}", state: "${data.state}", address: "${data.address}", lat: ${data.location?.latitude}, lng: ${data.location?.longitude}`);
+      logDebug(`Gym: "${data.name}" -> key: "${key}"`);
       gymsMap.set(key, {
         id: docSnap.id,
         latitude: data.location?.latitude,
@@ -169,25 +180,25 @@ export const getVisitedLocations = async (userId: string): Promise<VisitedLocati
         address: data.address || '',
       });
     });
-    console.log('=== End gyms list ===');
+    logDebug('=== End gyms list ===');
     
     // Process each unique location
     for (const [locationKey, { sessions, locationType }] of locationMap) {
       // Get the original location name (use the first session's format)
       const originalName = sessions[0].location;
       
-      console.log(`Processing location: "${originalName}" (key: "${locationKey}")`);
+      logDebug(`Processing location: "${originalName}" (key: "${locationKey}")`);
       
       // Try to get coordinates from gyms database first
       const gymData = gymsMap.get(locationKey);
       let coordinates: { latitude: number; longitude: number } | null = null;
       
-      console.log(`  Gym data found: ${gymData ? 'YES' : 'NO'}`, gymData);
+      logDebug(`  Gym data found: ${gymData ? 'YES' : 'NO'}`);
       
       // If gym has stored coordinates, use them
       if (gymData?.latitude && gymData?.longitude) {
         coordinates = { latitude: gymData.latitude, longitude: gymData.longitude };
-        console.log(`  Using stored coordinates: ${coordinates.latitude}, ${coordinates.longitude}`);
+        logDebug(`  Using stored coordinates: ${coordinates.latitude}, ${coordinates.longitude}`);
       }
       
       // If not found, try geocoding with city/state context for accuracy
@@ -225,29 +236,29 @@ export const getVisitedLocations = async (userId: string): Promise<VisitedLocati
           searchQuery = `${searchQuery} climbing gym`;
         }
         
-        console.log(`  Geocoding with query: "${searchQuery}" (city: ${city}, state: ${state})`);
+        logDebug(`  Geocoding with query: "${searchQuery}" (city: ${city}, state: ${state})`);
         coordinates = await geocodeLocation(searchQuery);
-        console.log(`  Geocode result:`, coordinates);
+        logDebug('  Geocode result:', coordinates);
         
         // If still not found, try alternative queries
         if (!coordinates && locationType === 'indoor') {
           // Try without "climbing gym" suffix
           if (city && state) {
             const simpleQuery = `${originalName}, ${city}, ${state}`;
-            console.log(`  Trying without suffix: "${simpleQuery}"`);
+            logDebug(`  Trying without suffix: "${simpleQuery}"`);
             coordinates = await geocodeLocation(simpleQuery);
-            console.log(`  Result:`, coordinates);
+            logDebug('  Result:', coordinates);
           }
           
           // Try with just city and state (no gym name - use for general location)
           if (!coordinates && city && state) {
             // Just get the city coordinates as fallback for now
             const cityQuery = `${city}, ${state}`;
-            console.log(`  Trying city only: "${cityQuery}"`);
+            logDebug(`  Trying city only: "${cityQuery}"`);
             const cityCoords = await geocodeLocation(cityQuery);
             if (cityCoords) {
               // Use city coordinates but log that this is approximate
-              console.log(`  Using city coordinates (approximate): ${cityCoords.latitude}, ${cityCoords.longitude}`);
+              logDebug(`  Using city coordinates (approximate): ${cityCoords.latitude}, ${cityCoords.longitude}`);
               coordinates = cityCoords;
             }
           }
@@ -264,9 +275,9 @@ export const getVisitedLocations = async (userId: string): Promise<VisitedLocati
               },
               updatedAt: serverTimestamp(),
             }, { merge: true });
-            console.log(`  ✓ Saved coordinates to gym ${gymData.id}`);
+            logDebug(`  ✓ Saved coordinates to gym ${gymData.id}`);
           } catch (e) {
-            console.error(`  Failed to save coordinates to gym:`, e);
+            logServiceError('LocationMapService.getVisitedLocations.saveCoordinates', e);
           }
         }
       }
@@ -295,7 +306,7 @@ export const getVisitedLocations = async (userId: string): Promise<VisitedLocati
     
     return visitedLocations;
   } catch (error) {
-    console.error('Error getting visited locations:', error);
+    logServiceError('LocationMapService.getVisitedLocations', error);
     return [];
   }
 };

@@ -29,6 +29,7 @@ import {
   Location,
 } from '../types';
 import { getGymNamesByCity } from './gymService';
+import { logServiceError } from '../utils/error';
 
 /**
  * Get user profile by ID
@@ -57,7 +58,7 @@ export const getProfile = async (userId: string): Promise<ApiResponse<UserProfil
       data: profile,
     };
   } catch (error: any) {
-    console.error('Get profile error:', error);
+    logServiceError('ProfileService.getProfile', error);
     return {
       success: false,
       error: 'Failed to fetch profile',
@@ -108,7 +109,7 @@ export const saveProfile = async (
     const result = await getProfile(userId);
     return result;
   } catch (error: any) {
-    console.error('Save profile error:', error);
+    logServiceError('ProfileService.saveProfile', error);
     return {
       success: false,
       error: 'Failed to save profile',
@@ -134,7 +135,7 @@ const uriToBlob = async (uri: string): Promise<Blob> => {
       resolve(xhr.response);
     };
     xhr.onerror = function (e) {
-      console.error('XHR error:', e);
+      logServiceError('ProfileService.uriToBlob', e);
       reject(new TypeError('Network request failed'));
     };
     xhr.responseType = 'blob';
@@ -190,8 +191,7 @@ export const uploadProfilePhoto = async (
       message: 'Profile photo uploaded',
     };
   } catch (error: any) {
-    console.error('Upload photo error:', error);
-    console.error('Error details:', error.code, error.message);
+    logServiceError('ProfileService.uploadProfilePhoto', error);
     return {
       success: false,
       error: error.message || 'Failed to upload photo',
@@ -223,7 +223,7 @@ export const deleteProfilePhoto = async (userId: string): Promise<ApiResponse<nu
       message: 'Profile photo deleted',
     };
   } catch (error: any) {
-    console.error('Delete photo error:', error);
+    logServiceError('ProfileService.deleteProfilePhoto', error);
     return {
       success: false,
       error: 'Failed to delete photo',
@@ -250,7 +250,7 @@ export const updateLocation = async (
       message: 'Location updated',
     };
   } catch (error: any) {
-    console.error('Update location error:', error);
+    logServiceError('ProfileService.updateLocation', error);
     return {
       success: false,
       error: 'Failed to update location',
@@ -390,7 +390,7 @@ export const searchClimbers = async (
       },
     };
   } catch (error: any) {
-    console.error('Search climbers error:', error);
+    logServiceError('ProfileService.searchClimbers', error);
     return {
       success: false,
       error: 'Failed to search climbers',
@@ -416,7 +416,7 @@ export const toggleSearchability = async (
       message: `Profile ${isSearchable ? 'visible' : 'hidden'} in search`,
     };
   } catch (error: any) {
-    console.error('Toggle searchability error:', error);
+    logServiceError('ProfileService.toggleSearchability', error);
     return {
       success: false,
       error: 'Failed to update visibility',

@@ -19,6 +19,7 @@ import {
   UserAchievementStats,
   ApiResponse,
 } from '../types';
+import { logServiceError } from '../utils/error';
 
 // Achievement definitions - Easy to add new achievements here
 export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
@@ -293,7 +294,7 @@ export const getUserAchievements = async (userId: string): Promise<ApiResponse<U
     
     return { success: true, data: achievements };
   } catch (error: any) {
-    console.error('Get user achievements error:', error);
+    logServiceError('AchievementService.getUserAchievements', error);
     return { success: false, error: 'Failed to fetch achievements' };
   }
 };
@@ -399,7 +400,7 @@ export const getUserAchievementStats = async (userId: string): Promise<ApiRespon
       },
     };
   } catch (error: any) {
-    console.error('Get user achievement stats error:', error);
+    logServiceError('AchievementService.getUserAchievementStats', error);
     return { 
       success: false, 
       error: 'Failed to fetch achievement stats',
@@ -475,7 +476,7 @@ export const checkAndAwardAchievements = async (
     
     return { success: true, data: progressList };
   } catch (error: any) {
-    console.error('Check and award achievements error:', error);
+    logServiceError('AchievementService.checkAndAwardAchievements', error);
     return { success: false, error: 'Failed to check achievements' };
   }
 };
@@ -518,7 +519,7 @@ export const awardAchievement = async (
       },
     };
   } catch (error: any) {
-    console.error('Award achievement error:', error);
+    logServiceError('AchievementService.awardAchievement', error);
     return { success: false, error: 'Failed to award achievement' };
   }
 };
@@ -543,7 +544,7 @@ export const markAchievementNotified = async (
     
     return { success: true };
   } catch (error: any) {
-    console.error('Mark achievement notified error:', error);
+    logServiceError('AchievementService.markAchievementNotified', error);
     return { success: false, error: 'Failed to update achievement' };
   }
 };
@@ -563,6 +564,6 @@ export const incrementMessageCount = async (userId: string): Promise<void> => {
       await setDoc(statsRef, { messagesSent: 1 });
     }
   } catch (error) {
-    console.error('Increment message count error:', error);
+    logServiceError('AchievementService.incrementMessageCount', error);
   }
 };

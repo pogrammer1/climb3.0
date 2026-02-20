@@ -18,6 +18,7 @@ import { auth, db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
 import { User, SignupFormData, LoginFormData, ApiResponse } from '../types';
 import { checkBackoff, checkRateLimit, registerBackoffFailure, resetBackoff } from '../utils';
+import { logServiceError } from '../utils/error';
 
 const PASSWORD_RESET_RATE_LIMIT = {
   maxAttempts: 3,
@@ -81,7 +82,7 @@ export const signUp = async (data: SignupFormData): Promise<ApiResponse<User>> =
       message: 'Account created successfully',
     };
   } catch (error: any) {
-    console.error('Sign up error:', error);
+    logServiceError('AuthService.signUp', error);
     return {
       success: false,
       error: getAuthErrorMessage(error.code),
@@ -134,7 +135,7 @@ export const signIn = async (data: LoginFormData): Promise<ApiResponse<User>> =>
       message: 'Signed in successfully',
     };
   } catch (error: any) {
-    console.error('Sign in error:', error);
+    logServiceError('AuthService.signIn', error);
 
     const errorCode = error?.code || '';
     const credentialFailureCodes = [
@@ -175,7 +176,7 @@ export const signOut = async (): Promise<ApiResponse<null>> => {
       message: 'Signed out successfully',
     };
   } catch (error: any) {
-    console.error('Sign out error:', error);
+    logServiceError('AuthService.signOut', error);
     return {
       success: false,
       error: 'Failed to sign out. Please try again.',
@@ -203,7 +204,7 @@ export const resetPassword = async (email: string): Promise<ApiResponse<null>> =
       message: 'Password reset email sent',
     };
   } catch (error: any) {
-    console.error('Password reset error:', error);
+    logServiceError('AuthService.resetPassword', error);
     return {
       success: false,
       error: getAuthErrorMessage(error.code),
@@ -247,7 +248,7 @@ export const sendVerificationEmail = async (): Promise<ApiResponse<null>> => {
       message: 'Verification email sent. Please check your inbox.',
     };
   } catch (error: any) {
-    console.error('Send verification email error:', error);
+    logServiceError('AuthService.sendVerificationEmail', error);
     return {
       success: false,
       error: getAuthErrorMessage(error.code),
@@ -275,7 +276,7 @@ export const updateUserDisplayName = async (displayName: string): Promise<ApiRes
       message: 'Display name updated',
     };
   } catch (error: any) {
-    console.error('Update display name error:', error);
+    logServiceError('AuthService.updateUserDisplayName', error);
     return {
       success: false,
       error: 'Failed to update display name',
@@ -310,7 +311,7 @@ export const updateUserEmail = async (
       message: 'Email updated successfully',
     };
   } catch (error: any) {
-    console.error('Update email error:', error);
+    logServiceError('AuthService.updateUserEmail', error);
     return {
       success: false,
       error: getAuthErrorMessage(error.code),
@@ -340,7 +341,7 @@ export const updateUserPassword = async (
       message: 'Password updated successfully',
     };
   } catch (error: any) {
-    console.error('Update password error:', error);
+    logServiceError('AuthService.updateUserPassword', error);
     return {
       success: false,
       error: getAuthErrorMessage(error.code),

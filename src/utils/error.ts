@@ -30,3 +30,21 @@ export const getApiErrorMessage = <T>(
 
   return fallback;
 };
+
+export const logServiceError = (scope: string, error: unknown): void => {
+  if (!__DEV__) return;
+
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+
+  const message = getErrorMessage(error, 'Unknown error');
+
+  if (typeof code === 'string' && code.trim()) {
+    console.warn(`[${scope}]`, { code, message });
+    return;
+  }
+
+  console.warn(`[${scope}]`, { message });
+};

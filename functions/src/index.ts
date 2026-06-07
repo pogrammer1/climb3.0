@@ -18,6 +18,7 @@ import {
 } from "firebase-functions/v2/firestore";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
+import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
 import * as logger from "firebase-functions/logger";
@@ -37,8 +38,8 @@ const db = admin.firestore();
 const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587", 10);
 const SMTP_USER = process.env.SMTP_USER || "";
-const SMTP_PASS = process.env.SMTP_PASS || "";
 const FROM_EMAIL = process.env.FROM_EMAIL || "";
+const SMTP_PASS = defineSecret("SMTP_PASS");
 
 const MATCH_REQUEST_RATE_LIMIT = {
   maxRequests: 5,
@@ -231,7 +232,9 @@ export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Pr
  * Create nodemailer transporter
  */
 function createTransporter(): nodemailer.Transporter | null {
-  if (!SMTP_USER || !SMTP_PASS) {
+  const smtpPass = SMTP_PASS.value();
+
+  if (!SMTP_USER || !smtpPass) {
     logger.warn("SMTP credentials not set. Skipping email send.");
     return null;
   }
@@ -241,7 +244,7 @@ function createTransporter(): nodemailer.Transporter | null {
     secure: SMTP_PORT === 465,
     auth: {
       user: SMTP_USER,
-      pass: SMTP_PASS,
+      pass: smtpPass,
     },
   });
 }
@@ -558,7 +561,10 @@ interface MatchData {
  * Trigger: New message created in a conversation
  */
 export const onNewMessage = onDocumentCreated(
-  "conversations/{conversationId}/messages/{messageId}",
+  {
+    document: "conversations/{conversationId}/messages/{messageId}",
+    secrets: [SMTP_PASS],
+  },
   async (event: FirestoreEvent<QueryDocumentSnapshot | undefined, {
     conversationId: string;
     messageId: string;
@@ -630,7 +636,10 @@ export const onNewMessage = onDocumentCreated(
  * Trigger: New match/connection request created
  */
 export const onNewConnectionRequest = onDocumentCreated(
-  "matches/{matchId}",
+  {
+    document: "matches/{matchId}",
+    secrets: [SMTP_PASS],
+  },
   async (event: FirestoreEvent<QueryDocumentSnapshot | undefined, {
     matchId: string;
   }>) => {
@@ -683,7 +692,10 @@ export const onNewConnectionRequest = onDocumentCreated(
  * Trigger: Match status updated to accepted
  */
 export const onConnectionAccepted = onDocumentUpdated(
-  "matches/{matchId}",
+  {
+    document: "matches/{matchId}",
+    secrets: [SMTP_PASS],
+  },
   async (event: FirestoreEvent<Change<QueryDocumentSnapshot> | undefined, {
     matchId: string;
   }>) => {

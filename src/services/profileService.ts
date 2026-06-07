@@ -29,6 +29,7 @@ import {
   Location,
 } from '../types';
 import { getGymNamesByCity } from './gymService';
+import { getModerationErrorMessage, validateTextContent } from '../utils/contentModeration';
 import { logServiceError } from '../utils/error';
 
 /**
@@ -75,6 +76,20 @@ export const saveProfile = async (
   isNew: boolean = false
 ): Promise<ApiResponse<UserProfile>> => {
   try {
+    const moderationResult = validateTextContent([
+      { label: 'Display name', value: profileData.displayName },
+      { label: 'Bio', value: profileData.bio },
+      { label: 'Home gym', value: profileData.homeGym },
+      { label: 'City', value: profileData.city },
+    ]);
+
+    if (!moderationResult.allowed) {
+      return {
+        success: false,
+        error: getModerationErrorMessage(moderationResult.field),
+      };
+    }
+
     const profileRef = doc(db, COLLECTIONS.PROFILES, userId);
     const user = auth.currentUser;
     

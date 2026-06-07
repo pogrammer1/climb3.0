@@ -25,7 +25,7 @@ import {
   ApiResponse,
   PaginatedResponse,
 } from '../types';
-import { checkRateLimit } from '../utils';
+import { checkRateLimit, getModerationErrorMessage, validateTextContent } from '../utils';
 import { logServiceError } from '../utils/error';
 
 const MESSAGE_SEND_RATE_LIMIT = {
@@ -200,6 +200,17 @@ export const sendMessage = async (
       return {
         success: false,
         error: `You're sending messages too quickly. Try again in ${retrySeconds}s.`,
+      };
+    }
+
+    const moderationResult = validateTextContent([
+      { label: 'Message', value: text },
+    ]);
+
+    if (!moderationResult.allowed) {
+      return {
+        success: false,
+        error: getModerationErrorMessage(moderationResult.field),
       };
     }
 

@@ -35,6 +35,7 @@ export type RootStackParamList = {
   Settings: undefined;
   AccountSettings: undefined;
   NotificationSettings: undefined;
+  Legal: undefined;
   Achievements: { userId?: string } | undefined;
   ReportContent: {
     targetType: 'user' | 'message';

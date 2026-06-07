@@ -6,3 +6,4 @@ export { AccountSettingsScreen } from './AccountSettingsScreen';
 export { NotificationSettingsScreen } from './NotificationSettingsScreen';
 export { AchievementsScreen } from './AchievementsScreen';
 export { ReportContentScreen } from './ReportContentScreen';
+export { LegalScreen } from './LegalScreen';

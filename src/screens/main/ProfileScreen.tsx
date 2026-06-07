@@ -287,10 +287,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           />
 
           <List.Item
-            title="Privacy"
+            title="Privacy & Terms"
             left={(props) => <List.Icon {...props} icon="shield-account" />}
             right={(props) => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => showAlert('Coming Soon', 'Privacy settings will be available in a future update.')}
+            onPress={() => navigation.navigate('Legal')}
           />
 
           <List.Item

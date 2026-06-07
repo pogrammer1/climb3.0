@@ -5,10 +5,8 @@ import {
   getUserAchievementStats,
   checkAndAwardAchievements,
   markAchievementNotified,
-  ACHIEVEMENT_DEFINITIONS,
-  getAchievementsByCategory,
 } from '../services/achievementService';
-import { AchievementProgress, UserAchievement, UserAchievementStats, AchievementDefinition } from '../types';
+import { AchievementProgress, UserAchievement, UserAchievementStats } from '../types';
 import { logServiceError } from '../utils/error';
 
 interface AchievementState {
@@ -92,8 +90,6 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
   },
   
   refreshAchievements: async (userId) => {
-    const { stats } = get();
-    
     // Get fresh stats
     const statsResult = await getUserAchievementStats(userId);
     

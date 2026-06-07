@@ -94,6 +94,17 @@ describe('Security rules', () => {
         updatedAt: new Date(),
       });
 
+      await setDoc(doc(adminDb, 'profiles', 'u1', 'achievements', 'sessions_1'), {
+        achievementId: 'sessions_1',
+        progress: 1,
+        unlockedAt: new Date(),
+        notified: false,
+      });
+
+      await setDoc(doc(adminDb, 'profiles', 'u1', 'stats', 'messaging'), {
+        messagesSent: 3,
+      });
+
       await setDoc(doc(adminDb, 'conversations', 'conv_u1_u2'), {
         participantIds: ['u1', 'u2'],
         participants: {
@@ -292,6 +303,48 @@ describe('Security rules', () => {
     await assertFails(
       updateDoc(doc(u1Db, 'profiles', 'u1'), {
         email: 'u1@example.com',
+      })
+    );
+  });
+
+  test('achievements and stats: clients cannot forge server-owned counters', async () => {
+    const u1Db = authedContext('u1').firestore();
+    const u2Db = authedContext('u2').firestore();
+
+    await assertSucceeds(getDoc(doc(u2Db, 'profiles', 'u1', 'achievements', 'sessions_1')));
+    await assertSucceeds(getDoc(doc(u1Db, 'profiles', 'u1', 'stats', 'messaging')));
+    await assertFails(getDoc(doc(u2Db, 'profiles', 'u1', 'stats', 'messaging')));
+
+    await assertFails(
+      setDoc(doc(u1Db, 'profiles', 'u1', 'achievements', 'sessions_5'), {
+        achievementId: 'sessions_5',
+        progress: 5,
+        unlockedAt: new Date(),
+        notified: false,
+      })
+    );
+
+    await assertSucceeds(
+      updateDoc(doc(u1Db, 'profiles', 'u1', 'achievements', 'sessions_1'), {
+        notified: true,
+      })
+    );
+
+    await assertFails(
+      updateDoc(doc(u1Db, 'profiles', 'u1', 'achievements', 'sessions_1'), {
+        progress: 999,
+      })
+    );
+
+    await assertFails(
+      setDoc(doc(u1Db, 'profiles', 'u1', 'stats', 'messaging'), {
+        messagesSent: 999,
+      })
+    );
+
+    await assertFails(
+      updateDoc(doc(u1Db, 'profiles', 'u1', 'stats', 'messaging'), {
+        messagesSent: 999,
       })
     );
   });

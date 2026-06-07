@@ -61,6 +61,48 @@ type IncrementGymSessionCountResult = {
   sessionCount: number;
 };
 
+type AchievementCategory =
+  | "climbing_hours"
+  | "sessions_logged"
+  | "connections_made"
+  | "messages_sent"
+  | "app_usage"
+  | "grades_climbed"
+  | "years_experience";
+
+type AchievementDefinition = {
+  id: string;
+  category: AchievementCategory;
+  requirement: {
+    target: number;
+  };
+};
+
+type UserAchievementStats = {
+  totalHoursClimbed: number;
+  totalSessions: number;
+  totalConnections: number;
+  totalMessagesSent: number;
+  daysActive: number;
+  highestVGrade: number;
+  highestYDSGrade: string;
+  yearsClimbing: number;
+};
+
+type AchievementProgressResult = {
+  achievementId: string;
+  currentProgress: number;
+  isUnlocked: boolean;
+  unlockedAt?: number;
+  percentComplete: number;
+};
+
+type SyncUserAchievementsResult = {
+  stats: UserAchievementStats;
+  achievements: AchievementProgressResult[];
+  newAchievementIds: string[];
+};
+
 type SendMatchRequestResult = {
   id: string;
   userId: string;
@@ -82,6 +124,28 @@ type ExportUserDataResult = {
   auth: Record<string, unknown> | null;
   firestore: Record<string, unknown>;
 };
+
+const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
+  {id: "climbing_hours_5", category: "climbing_hours", requirement: {target: 5}},
+  {id: "climbing_hours_10", category: "climbing_hours", requirement: {target: 10}},
+  {id: "climbing_hours_50", category: "climbing_hours", requirement: {target: 50}},
+  {id: "climbing_hours_100", category: "climbing_hours", requirement: {target: 100}},
+  {id: "sessions_1", category: "sessions_logged", requirement: {target: 1}},
+  {id: "sessions_5", category: "sessions_logged", requirement: {target: 5}},
+  {id: "sessions_10", category: "sessions_logged", requirement: {target: 10}},
+  {id: "sessions_25", category: "sessions_logged", requirement: {target: 25}},
+  {id: "connections_1", category: "connections_made", requirement: {target: 1}},
+  {id: "connections_3", category: "connections_made", requirement: {target: 3}},
+  {id: "connections_5", category: "connections_made", requirement: {target: 5}},
+  {id: "connections_10", category: "connections_made", requirement: {target: 10}},
+  {id: "app_days_1", category: "app_usage", requirement: {target: 1}},
+  {id: "app_days_3", category: "app_usage", requirement: {target: 3}},
+  {id: "app_days_7", category: "app_usage", requirement: {target: 7}},
+  {id: "app_days_30", category: "app_usage", requirement: {target: 30}},
+  {id: "messages_10", category: "messages_sent", requirement: {target: 10}},
+  {id: "messages_50", category: "messages_sent", requirement: {target: 50}},
+  {id: "messages_100", category: "messages_sent", requirement: {target: 100}},
+];
 
 function escapeHtml(value: string): string {
   return value
@@ -150,6 +214,118 @@ function serializeDocument(docSnap: FirebaseFirestore.DocumentSnapshot): Record<
   return {
     id: docSnap.id,
     ...(serializeFirestoreValue(docSnap.data() || {}) as Record<string, unknown>),
+  };
+}
+
+function timestampMillis(value: unknown): number | undefined {
+  if (value instanceof admin.firestore.Timestamp) {
+    return value.toMillis();
+  }
+
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  return undefined;
+}
+
+function progressForCategory(category: AchievementCategory, stats: UserAchievementStats): number {
+  switch (category) {
+  case "climbing_hours":
+    return stats.totalHoursClimbed;
+  case "sessions_logged":
+    return stats.totalSessions;
+  case "connections_made":
+    return stats.totalConnections;
+  case "messages_sent":
+    return stats.totalMessagesSent;
+  case "app_usage":
+    return stats.daysActive;
+  case "grades_climbed":
+    return stats.highestVGrade;
+  case "years_experience":
+    return stats.yearsClimbing;
+  default:
+    return 0;
+  }
+}
+
+async function getAchievementStats(userId: string): Promise<UserAchievementStats> {
+  const profileSnap = await db.collection("profiles").doc(userId).get();
+  if (!profileSnap.exists) {
+    throw new HttpsError("not-found", "User profile was not found.");
+  }
+
+  const profileData = profileSnap.data() || {};
+  const publicStats = profileData.publicStats || {};
+  if (!profileData.publicStats) {
+    const sessionsSnap = await db
+      .collection("sessions")
+      .where("userId", "==", userId)
+      .get();
+    let totalHoursClimbed = 0;
+    sessionsSnap.forEach((sessionSnap) => {
+      totalHoursClimbed += ((sessionSnap.data().duration as number) || 0) / 60;
+    });
+
+    const matchesSnap1 = await db
+      .collection("matches")
+      .where("userId", "==", userId)
+      .where("status", "==", "accepted")
+      .get();
+    const matchesSnap2 = await db
+      .collection("matches")
+      .where("matchedUserId", "==", userId)
+      .where("status", "==", "accepted")
+      .get();
+    const statsSnap = await db
+      .collection("profiles")
+      .doc(userId)
+      .collection("stats")
+      .doc("messaging")
+      .get();
+
+    const createdAtMillis = timestampMillis(profileData.createdAt) || Date.now();
+    const daysActive = Math.max(1, Math.floor((Date.now() - createdAtMillis) / (1000 * 60 * 60 * 24)));
+    const highestGradeBouldering = profileData.highestGradeBouldering;
+    const highestVGrade =
+      typeof highestGradeBouldering === "string" &&
+      highestGradeBouldering.startsWith("V") &&
+      highestGradeBouldering !== "VB" ?
+        parseInt(highestGradeBouldering.substring(1), 10) || 0 :
+        0;
+
+    return {
+      totalHoursClimbed: Math.round(totalHoursClimbed * 10) / 10,
+      totalSessions: sessionsSnap.size,
+      totalConnections: matchesSnap1.size + matchesSnap2.size,
+      totalMessagesSent: (statsSnap.data()?.messagesSent as number) || 0,
+      daysActive,
+      highestVGrade,
+      highestYDSGrade: (profileData.highestGradeYDS as string) || "",
+      yearsClimbing: (profileData.yearsClimbing as number) || 0,
+    };
+  }
+
+  const createdAtMillis =
+    timestampMillis(publicStats.createdAt) ||
+    timestampMillis(profileData.createdAt) ||
+    Date.now();
+  const daysActive = Math.max(1, Math.floor((Date.now() - createdAtMillis) / (1000 * 60 * 60 * 24)));
+
+  return {
+    totalHoursClimbed: Math.round(((publicStats.totalHoursClimbed as number) || 0) * 10) / 10,
+    totalSessions: (publicStats.totalSessions as number) || 0,
+    totalConnections: (publicStats.totalConnections as number) || 0,
+    totalMessagesSent: (publicStats.totalMessagesSent as number) || 0,
+    daysActive,
+    highestVGrade: (publicStats.highestVGrade as number) || 0,
+    highestYDSGrade: (publicStats.highestYDSGrade as string) || "",
+    yearsClimbing: (publicStats.yearsClimbing as number) || (profileData.yearsClimbing as number) || 0,
   };
 }
 
@@ -399,6 +575,75 @@ export const incrementGymSessionCount = onCall<IncrementGymSessionCountData>(
 
       logger.error("incrementGymSessionCount callable failed", safeErrorDetails(error));
       throw new HttpsError("internal", "Failed to update gym popularity.");
+    }
+  }
+);
+
+export const syncUserAchievements = onCall(
+  async (request): Promise<SyncUserAchievementsResult> => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "You must be signed in to sync achievements.");
+    }
+
+    const userId = request.auth.uid;
+
+    try {
+      const stats = await getAchievementStats(userId);
+      const achievementsRef = db.collection("profiles").doc(userId).collection("achievements");
+      const existingSnap = await achievementsRef.get();
+      const existing = new Map<string, FirebaseFirestore.DocumentData>();
+
+      existingSnap.forEach((docSnap) => {
+        existing.set(docSnap.id, docSnap.data());
+      });
+
+      const batch = db.batch();
+      const newAchievementIds: string[] = [];
+      const progressResults: AchievementProgressResult[] = [];
+
+      for (const definition of ACHIEVEMENT_DEFINITIONS) {
+        const currentProgress = progressForCategory(definition.category, stats);
+        const existingAchievement = existing.get(definition.id);
+        const alreadyUnlocked = Boolean(existingAchievement);
+        const isUnlocked = currentProgress >= definition.requirement.target;
+
+        if (isUnlocked && !alreadyUnlocked) {
+          batch.set(achievementsRef.doc(definition.id), {
+            achievementId: definition.id,
+            progress: currentProgress,
+            unlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+            notified: false,
+          });
+          newAchievementIds.push(definition.id);
+        }
+
+        progressResults.push({
+          achievementId: definition.id,
+          currentProgress,
+          isUnlocked: isUnlocked || alreadyUnlocked,
+          unlockedAt: alreadyUnlocked ?
+            timestampMillis(existingAchievement?.unlockedAt) :
+            (isUnlocked ? Date.now() : undefined),
+          percentComplete: Math.min(100, (currentProgress / definition.requirement.target) * 100),
+        });
+      }
+
+      if (newAchievementIds.length > 0) {
+        await batch.commit();
+      }
+
+      return {
+        stats,
+        achievements: progressResults,
+        newAchievementIds,
+      };
+    } catch (error) {
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      logger.error("syncUserAchievements callable failed", safeErrorDetails(error));
+      throw new HttpsError("internal", "Failed to sync achievements.");
     }
   }
 );

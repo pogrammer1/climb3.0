@@ -345,19 +345,24 @@ service cloud.firestore {
         // Anyone authenticated can read achievements (to see on profiles)
         allow read: if isAuthenticated();
         
-        // Only the user can write their own achievements
-        allow create: if isOwner(userId);
-        allow update: if isOwner(userId);
-        allow delete: if isOwner(userId);
+        // Achievement awards are created by Cloud Functions; users can only clear local notification state.
+        allow create: if false;
+        allow update: if isOwner(userId) &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notified']) &&
+                        request.resource.data.achievementId == resource.data.achievementId &&
+                        request.resource.data.progress == resource.data.progress &&
+                        request.resource.data.unlockedAt == resource.data.unlockedAt &&
+                        request.resource.data.notified == true;
+        allow delete: if false;
       }
       
       // Stats subcollection (messaging stats, etc.)
       match /stats/{statId} {
-        // Only the user can read/write their own stats
+        // Private stat docs are read by owners and written by Cloud Functions/Admin SDK only.
         allow read: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if isOwner(userId);
-        allow delete: if isOwner(userId);
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
       }
     }
 

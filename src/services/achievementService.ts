@@ -4,13 +4,12 @@ import {
   collection,
   getDoc,
   getDocs,
-  setDoc,
   updateDoc,
   query,
   where,
-  serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
 import {
   AchievementDefinition,
@@ -20,6 +19,18 @@ import {
   ApiResponse,
 } from '../types';
 import { logServiceError } from '../utils/error';
+
+type SyncUserAchievementsCallableResult = {
+  stats: UserAchievementStats;
+  achievements: Array<{
+    achievementId: string;
+    currentProgress: number;
+    isUnlocked: boolean;
+    unlockedAt?: number;
+    percentComplete: number;
+  }>;
+  newAchievementIds: string[];
+};
 
 // Achievement definitions - Easy to add new achievements here
 export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
@@ -409,119 +420,117 @@ export const getUserAchievementStats = async (userId: string): Promise<ApiRespon
 };
 
 /**
- * Check and award new achievements based on user stats
+ * Build achievement progress locally for read-only profile display.
+ */
+export const buildAchievementProgress = (
+  stats: UserAchievementStats,
+  existingAchievements: UserAchievement[] = []
+): AchievementProgress[] => {
+  const existingById = new Map(existingAchievements.map(achievement => [achievement.achievementId, achievement]));
+
+  return ACHIEVEMENT_DEFINITIONS.map((definition) => {
+    let currentProgress = 0;
+
+    switch (definition.category) {
+      case 'climbing_hours':
+        currentProgress = stats.totalHoursClimbed;
+        break;
+      case 'sessions_logged':
+        currentProgress = stats.totalSessions;
+        break;
+      case 'connections_made':
+        currentProgress = stats.totalConnections;
+        break;
+      case 'messages_sent':
+        currentProgress = stats.totalMessagesSent;
+        break;
+      case 'app_usage':
+        currentProgress = stats.daysActive;
+        break;
+      case 'grades_climbed':
+        currentProgress = stats.highestVGrade;
+        break;
+      case 'years_experience':
+        currentProgress = stats.yearsClimbing;
+        break;
+    }
+
+    const existingAchievement = existingById.get(definition.id);
+    const isUnlocked = Boolean(existingAchievement) || currentProgress >= definition.requirement.target;
+
+    return {
+      achievementId: definition.id,
+      definition,
+      currentProgress,
+      isUnlocked,
+      unlockedAt: existingAchievement?.unlockedAt,
+      percentComplete: Math.min(100, (currentProgress / definition.requirement.target) * 100),
+    };
+  });
+};
+
+/**
+ * Sync and award the current user's achievements on the server.
  */
 export const checkAndAwardAchievements = async (
   userId: string,
-  stats: UserAchievementStats
+  stats?: UserAchievementStats
 ): Promise<ApiResponse<AchievementProgress[]>> => {
   try {
-    // Get existing achievements
-    const existingResult = await getUserAchievements(userId);
-    const existingIds = new Set(
-      existingResult.data?.map(a => a.achievementId) || []
+    const functions = getFunctions(app, 'us-central1');
+    const callable = httpsCallable<void, SyncUserAchievementsCallableResult>(
+      functions,
+      'syncUserAchievements'
     );
-    
-    const progressList: AchievementProgress[] = [];
-    const newAchievements: string[] = [];
-    
-    for (const definition of ACHIEVEMENT_DEFINITIONS) {
-      let currentProgress = 0;
-      
-      // Calculate progress based on category
-      switch (definition.category) {
-        case 'climbing_hours':
-          currentProgress = stats.totalHoursClimbed;
-          break;
-        case 'sessions_logged':
-          currentProgress = stats.totalSessions;
-          break;
-        case 'connections_made':
-          currentProgress = stats.totalConnections;
-          break;
-        case 'messages_sent':
-          currentProgress = stats.totalMessagesSent;
-          break;
-        case 'app_usage':
-          currentProgress = stats.daysActive;
-          break;
-        case 'grades_climbed':
-          currentProgress = stats.highestVGrade;
-          break;
-        case 'years_experience':
-          currentProgress = stats.yearsClimbing;
-          break;
+    const result = await callable();
+
+    const progressList = result.data.achievements.reduce<AchievementProgress[]>((items, achievement) => {
+      const definition = getAchievementDefinition(achievement.achievementId);
+
+      if (!definition) {
+        return items;
       }
-      
-      const isUnlocked = currentProgress >= definition.requirement.target;
-      const wasAlreadyUnlocked = existingIds.has(definition.id);
-      
-      // Award new achievement if just unlocked
-      if (isUnlocked && !wasAlreadyUnlocked) {
-        await awardAchievement(userId, definition.id, currentProgress);
-        newAchievements.push(definition.id);
-      }
-      
-      progressList.push({
-        achievementId: definition.id,
+
+      items.push({
+        achievementId: achievement.achievementId,
         definition,
-        currentProgress,
-        isUnlocked: isUnlocked || wasAlreadyUnlocked,
-        unlockedAt: wasAlreadyUnlocked 
-          ? existingResult.data?.find(a => a.achievementId === definition.id)?.unlockedAt
-          : isUnlocked ? new Date() : undefined,
-        percentComplete: Math.min(100, (currentProgress / definition.requirement.target) * 100),
+        currentProgress: achievement.currentProgress,
+        isUnlocked: achievement.isUnlocked,
+        unlockedAt: achievement.unlockedAt ? new Date(achievement.unlockedAt) : undefined,
+        percentComplete: achievement.percentComplete,
       });
-    }
-    
+
+      return items;
+    }, []);
+
     return { success: true, data: progressList };
   } catch (error: any) {
     logServiceError('AchievementService.checkAndAwardAchievements', error);
+
+    if (stats) {
+      const existingResult = await getUserAchievements(userId);
+      if (existingResult.success) {
+        return { success: true, data: buildAchievementProgress(stats, existingResult.data || []) };
+      }
+    }
+
     return { success: false, error: 'Failed to check achievements' };
   }
 };
 
 /**
- * Award a specific achievement to user
+ * Awarding is server-only. Kept as a compatibility wrapper for older call sites.
  */
 export const awardAchievement = async (
-  userId: string,
-  achievementId: string,
-  progress: number
+  _userId: string,
+  _achievementId: string,
+  _progress: number
 ): Promise<ApiResponse<UserAchievement>> => {
-  try {
-    const achievementRef = doc(
-      db, 
-      COLLECTIONS.PROFILES, 
-      userId, 
-      'achievements', 
-      achievementId
-    );
-    
-    const achievementData = {
-      achievementId,
-      progress,
-      unlockedAt: serverTimestamp(),
-      notified: false,
-    };
-    
-    await setDoc(achievementRef, achievementData);
-    
-    return {
-      success: true,
-      data: {
-        id: achievementId,
-        odUserId: userId,
-        achievementId,
-        progress,
-        unlockedAt: new Date(),
-        notified: false,
-      },
-    };
-  } catch (error: any) {
-    logServiceError('AchievementService.awardAchievement', error);
-    return { success: false, error: 'Failed to award achievement' };
-  }
+  logServiceError(
+    'AchievementService.awardAchievement',
+    new Error('Client attempted to award an achievement directly')
+  );
+  return { success: false, error: 'Achievements are awarded by the server' };
 };
 
 /**
@@ -549,21 +558,3 @@ export const markAchievementNotified = async (
   }
 };
 
-/**
- * Increment message sent count for user stats
- */
-export const incrementMessageCount = async (userId: string): Promise<void> => {
-  try {
-    const statsRef = doc(db, COLLECTIONS.PROFILES, userId, 'stats', 'messaging');
-    const statsSnap = await getDoc(statsRef);
-    
-    if (statsSnap.exists()) {
-      const currentCount = statsSnap.data().messagesSent || 0;
-      await updateDoc(statsRef, { messagesSent: currentCount + 1 });
-    } else {
-      await setDoc(statsRef, { messagesSent: 1 });
-    }
-  } catch (error) {
-    logServiceError('AchievementService.incrementMessageCount', error);
-  }
-};

@@ -81,7 +81,6 @@ export const saveProfile = async (
     const dataToSave: Partial<UserProfile> = {
       ...profileData,
       uid: userId,
-      email: user?.email || '',
       updatedAt: new Date(),
       yearsClimbing: profileData.yearsClimbing ? parseInt(profileData.yearsClimbing, 10) : 0,
     };

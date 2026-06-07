@@ -286,6 +286,12 @@ describe('Security rules', () => {
         role: 'admin',
       })
     );
+
+    await assertFails(
+      updateDoc(doc(u1Db, 'profiles', 'u1'), {
+        email: 'u1@example.com',
+      })
+    );
   });
 
   test('sessions and climbs: reject unknown fields, owner spoofing, and oversized notes', async () => {

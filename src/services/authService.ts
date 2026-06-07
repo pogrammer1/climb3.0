@@ -14,7 +14,8 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, auth, db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
 import { User, SignupFormData, LoginFormData, ApiResponse } from '../types';
 import { checkBackoff, checkRateLimit, registerBackoffFailure, resetBackoff } from '../utils';
@@ -34,6 +35,10 @@ const SIGN_IN_BACKOFF_CONFIG = {
   maxFailuresBeforeBackoff: 3,
   initialBackoffMs: 30 * 1000,
   maxBackoffMs: 15 * 60 * 1000,
+};
+
+type DeleteAccountCallableResult = {
+  deleted: boolean;
 };
 
 const getRetryDelayText = (retryAfterMs: number): string => {
@@ -252,6 +257,45 @@ export const sendVerificationEmail = async (): Promise<ApiResponse<null>> => {
     return {
       success: false,
       error: getAuthErrorMessage(error.code),
+    };
+  }
+};
+
+/**
+ * Delete current user's account and owned app data.
+ */
+export const deleteAccount = async (): Promise<ApiResponse<null>> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return {
+        success: false,
+        error: 'No user is currently signed in.',
+      };
+    }
+
+    const functions = getFunctions(app, 'us-central1');
+    const callable = httpsCallable<void, DeleteAccountCallableResult>(functions, 'deleteAccount');
+    const result = await callable();
+
+    if (!result.data?.deleted) {
+      return {
+        success: false,
+        error: 'Failed to delete account.',
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Account deleted.',
+    };
+  } catch (error: any) {
+    logServiceError('AuthService.deleteAccount', error);
+    return {
+      success: false,
+      error: error?.code === 'functions/unauthenticated'
+        ? 'Please sign in again to delete your account.'
+        : 'Failed to delete account. Please try again or contact support.',
     };
   }
 };

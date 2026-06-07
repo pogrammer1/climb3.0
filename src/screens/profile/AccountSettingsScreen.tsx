@@ -1,5 +1,5 @@
 // Account Settings Screen
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, ScrollView } from 'react-native';
 import { Text, useTheme, List, Divider, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button } from '../../components/common';
 import { useAuthStore } from '../../store';
 import { showAlert } from '../../utils/alert';
-import { sendVerificationEmail } from '../../services/authService';
+import { deleteAccount, resetPassword, sendVerificationEmail } from '../../services/authService';
 
 interface AccountSettingsScreenProps {
   navigation: any;
@@ -15,9 +15,13 @@ interface AccountSettingsScreenProps {
 
 export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigation }) => {
   const theme = useTheme();
-  const { user, profile } = useAuthStore();
+  const { user, profile, clearAuth } = useAuthStore();
+  const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const handleChangePassword = () => {
+    if (!user?.email || isSendingPasswordReset) return;
+
     showAlert(
       'Change Password',
       'A password reset email will be sent to your email address.',
@@ -25,9 +29,16 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Send Email', 
-          onPress: () => {
-            // Implement password reset email
-            showAlert('Email Sent', 'Check your inbox for password reset instructions.');
+          onPress: async () => {
+            setIsSendingPasswordReset(true);
+            const result = await resetPassword(user.email || '');
+            setIsSendingPasswordReset(false);
+
+            if (result.success) {
+              showAlert('Email Sent', result.message || 'Check your inbox for password reset instructions.');
+            } else {
+              showAlert('Could Not Send Email', result.error || 'Failed to send password reset email.');
+            }
           }
         },
       ]
@@ -35,16 +46,27 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
   };
 
   const handleDeleteAccount = () => {
+    if (isDeletingAccount) return;
+
     showAlert(
       'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone.',
+      'This will permanently delete your account, profile, sessions, climbs, schedule, matches, conversations, and uploaded photos. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            showAlert('Contact Support', 'To delete your account, please email belay.app.notifications@gmail.com');
+          onPress: async () => {
+            setIsDeletingAccount(true);
+            const result = await deleteAccount();
+            setIsDeletingAccount(false);
+
+            if (result.success) {
+              clearAuth();
+              showAlert('Account Deleted', 'Your account and app data have been deleted.');
+            } else {
+              showAlert('Could Not Delete Account', result.error || 'Please try again or contact support.');
+            }
           }
         },
       ]
@@ -128,6 +150,7 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
             left={(props) => <List.Icon {...props} icon="lock-outline" />}
             right={(props) => <List.Icon {...props} icon="chevron-right" />}
             onPress={handleChangePassword}
+            disabled={isSendingPasswordReset}
           />
 
           {!user?.emailVerified && (
@@ -148,9 +171,11 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
           </Text>
 
           <Button
-            title="Delete Account"
+            title={isDeletingAccount ? 'Deleting Account' : 'Delete Account'}
             onPress={handleDeleteAccount}
             variant="outline"
+            loading={isDeletingAccount}
+            disabled={isDeletingAccount}
           />
         </Card>
       </ScrollView>

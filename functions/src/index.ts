@@ -62,6 +62,11 @@ type SendMatchRequestResult = {
   updatedAt: number;
 };
 
+type DeleteAccountResult = {
+  deleted: true;
+  counts: Record<string, number>;
+};
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -88,6 +93,48 @@ function safeErrorDetails(error: unknown): { code?: string; name?: string } {
   }
 
   return details;
+}
+
+async function deleteQueryDocuments(query: FirebaseFirestore.Query): Promise<number> {
+  let deletedCount = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const snapshot = await query.limit(400).get();
+    if (snapshot.empty) {
+      hasMore = false;
+      continue;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+    deletedCount += snapshot.size;
+
+    if (snapshot.size < 400) {
+      hasMore = false;
+    }
+  }
+
+  return deletedCount;
+}
+
+async function deleteDocumentIfExists(ref: FirebaseFirestore.DocumentReference): Promise<number> {
+  const snapshot = await ref.get();
+  if (!snapshot.exists) {
+    return 0;
+  }
+
+  await ref.delete();
+  return 1;
+}
+
+async function deleteStoragePrefix(prefix: string): Promise<void> {
+  try {
+    await admin.storage().bucket().deleteFiles({prefix});
+  } catch (error) {
+    logger.warn("Storage prefix deletion skipped", safeErrorDetails(error));
+  }
 }
 
 async function enforceRateLimit(
@@ -225,6 +272,75 @@ export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Pr
     logger.error("sendMatchRequest callable failed", safeErrorDetails(error));
 
     throw new HttpsError("internal", "Failed to send match request.");
+  }
+});
+
+export const deleteAccount = onCall(async (request): Promise<DeleteAccountResult> => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "You must be signed in to delete your account.");
+  }
+
+  const userId = request.auth.uid;
+  const counts: Record<string, number> = {};
+
+  try {
+    const sessionsSnapshot = await db
+      .collection("sessions")
+      .where("userId", "==", userId)
+      .get();
+
+    counts.climbs = 0;
+    for (const sessionDoc of sessionsSnapshot.docs) {
+      counts.climbs += await deleteQueryDocuments(
+        db.collection("climbs").where("sessionId", "==", sessionDoc.id)
+      );
+      await deleteStoragePrefix(`session-photos/${sessionDoc.id}_`);
+    }
+
+    if (!sessionsSnapshot.empty) {
+      const batch = db.batch();
+      sessionsSnapshot.docs.forEach((sessionDoc) => batch.delete(sessionDoc.ref));
+      await batch.commit();
+    }
+    counts.sessions = sessionsSnapshot.size;
+
+    const conversationsSnapshot = await db
+      .collection("conversations")
+      .where("participantIds", "array-contains", userId)
+      .get();
+
+    for (const conversationDoc of conversationsSnapshot.docs) {
+      await db.recursiveDelete(conversationDoc.ref);
+    }
+    counts.conversations = conversationsSnapshot.size;
+
+    counts.matchesInitiated = await deleteQueryDocuments(
+      db.collection("matches").where("userId", "==", userId)
+    );
+    counts.matchesReceived = await deleteQueryDocuments(
+      db.collection("matches").where("matchedUserId", "==", userId)
+    );
+    counts.schedules = await deleteDocumentIfExists(db.collection("schedules").doc(userId));
+
+    counts.notifications = await deleteQueryDocuments(
+      db.collection("notifications").where("userId", "==", userId)
+    );
+    counts.recipientNotifications = await deleteQueryDocuments(
+      db.collection("notifications").where("recipientId", "==", userId)
+    );
+
+    await db.recursiveDelete(db.collection("profiles").doc(userId));
+    counts.profiles = 1;
+    counts.users = await deleteDocumentIfExists(db.collection("users").doc(userId));
+
+    await deleteStoragePrefix(`profile-photos/${userId}/`);
+    await admin.auth().deleteUser(userId);
+
+    logger.info("Account deletion completed");
+    return {deleted: true, counts};
+  } catch (error) {
+    logger.error("deleteAccount callable failed", safeErrorDetails(error));
+    throw new HttpsError("internal", "Failed to delete account.");
   }
 });
 

@@ -47,11 +47,16 @@ storage = getStorage(app);
 
 const appCheckSiteKey = process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_WEB_RECAPTCHA_SITE_KEY;
 const appCheckDebugToken = process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN;
+const appCheckRequired = process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_REQUIRED === 'true';
 
 if (Platform.OS === 'web') {
-  if (appCheckDebugToken && typeof globalThis !== 'undefined') {
+  if (__DEV__ && appCheckDebugToken && typeof globalThis !== 'undefined') {
     (globalThis as typeof globalThis & { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
       appCheckDebugToken;
+  }
+
+  if (!__DEV__ && appCheckDebugToken) {
+    logServiceError('Firebase.appCheck.debugToken', new Error('App Check debug token is configured outside development'));
   }
 
   if (appCheckSiteKey) {
@@ -66,6 +71,10 @@ if (Platform.OS === 'web') {
   } else {
     if (__DEV__) {
       console.warn('Missing App Check site key: EXPO_PUBLIC_FIREBASE_APPCHECK_WEB_RECAPTCHA_SITE_KEY');
+    }
+
+    if (!__DEV__ && appCheckRequired) {
+      throw new Error('Firebase App Check web site key is required for this build');
     }
   }
 } else {

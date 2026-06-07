@@ -24,7 +24,8 @@ A cross-platform (iOS, Android, Web) application for rock climbers to log sessio
 - Copy `functions/.env.example` to `functions/.env` for local Functions emulator work. Do not commit real SMTP credentials.
 - Production email notifications read `SMTP_PASS` from Firebase Secret Manager. Set or rotate it with `firebase functions:secrets:set SMTP_PASS` before deploying Functions.
 - To clean legacy profile PII before release, run `npm run cleanup:profile-pii:dry-run` from `functions/`, then `npm run cleanup:profile-pii -- --execute` after confirming the count.
-- Keep App Check debug tokens out of production hosting builds. Use `EXPO_PUBLIC_FIREBASE_APPCHECK_WEB_RECAPTCHA_SITE_KEY` for web App Check.
+- Web App Check uses Firebase reCAPTCHA v3. For production web builds, set `EXPO_PUBLIC_FIREBASE_APPCHECK_WEB_RECAPTCHA_SITE_KEY` and `EXPO_PUBLIC_FIREBASE_APPCHECK_REQUIRED=true`; keep `EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN` unset outside local development. Enable App Check enforcement in Firebase only after token metrics look healthy.
+- Native Expo builds still need a native App Check provider integration before enforcing App Check for iOS/Android.
 
 ## License
 MIT License - see LICENSE file for details

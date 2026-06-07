@@ -13,6 +13,7 @@ import { getUserAchievementStats, checkAndAwardAchievements } from '../../servic
 import { ClimberProfile, WeeklySchedule, ScheduleOverlap, AchievementProgress } from '../../types';
 import { showAlert } from '../../utils/alert';
 import { useScheduleStore } from '../../store/scheduleStore';
+import { logServiceError } from '../../utils/error';
 
 interface ClimberProfileScreenProps {
   navigation: any;
@@ -86,7 +87,7 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
         setClimberSchedule(scheduleResult.data);
       }
     } catch (error) {
-      console.error('Error loading profile:', error);
+      logServiceError('ClimberProfileScreen.loadProfile', error);
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +132,7 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
         showAlert('Error', 'Could not open conversation.');
       }
     } catch (error) {
-      console.error('Error opening chat:', error);
+      logServiceError('ClimberProfileScreen.openConversation', error);
       showAlert('Error', 'Failed to open conversation.');
     } finally {
       setOpeningChat(false);

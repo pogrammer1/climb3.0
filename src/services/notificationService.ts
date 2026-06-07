@@ -23,7 +23,9 @@ export const getNotificationPermission = (): NotificationPermission | 'unsupport
  */
 export const requestNotificationPermission = async (): Promise<NotificationPermission | 'unsupported'> => {
   if (!isNotificationSupported()) {
-    console.warn('Notifications not supported in this browser');
+    if (__DEV__) {
+      console.warn('Notifications not supported in this browser');
+    }
     return 'unsupported';
   }
   
@@ -50,12 +52,16 @@ export const showNotification = (
   }
 ): Notification | null => {
   if (!isNotificationSupported()) {
-    console.warn('Notifications not supported');
+    if (__DEV__) {
+      console.warn('Notifications not supported');
+    }
     return null;
   }
   
   if (Notification.permission !== 'granted') {
-    console.warn('Notification permission not granted');
+    if (__DEV__) {
+      console.warn('Notification permission not granted');
+    }
     return null;
   }
   

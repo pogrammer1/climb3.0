@@ -12,6 +12,7 @@ import { formatTimeSlot, formatOverlapDuration } from '../../services/scheduleSe
 import { ConnectionScheduleMatch, ScheduleOverlap } from '../../types';
 import { showAlert } from '../../utils/alert';
 import { getOrCreateConversation } from '../../services/messageService';
+import { logServiceError } from '../../utils/error';
 
 interface ConnectionScheduleScreenProps {
   navigation: any;
@@ -81,7 +82,7 @@ export const ConnectionScheduleScreen: React.FC<ConnectionScheduleScreenProps> =
         showAlert('Error', 'Could not open conversation.');
       }
     } catch (error) {
-      console.error('Error opening conversation:', error);
+      logServiceError('ConnectionScheduleScreen.openConversation', error);
       showAlert('Error', 'Failed to open conversation.');
     }
   };

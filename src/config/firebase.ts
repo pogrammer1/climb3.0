@@ -6,6 +6,7 @@ import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage, FirebaseStorage, connectStorageEmulator } from 'firebase/storage';
 import { Platform } from 'react-native';
+import { logServiceError } from '../utils/error';
 
 // Firebase configuration object
 // Values are loaded from environment variables (.env file)
@@ -23,7 +24,7 @@ const firebaseConfig = {
 // Validate Firebase config
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'appId'] as const;
 const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
-if (missingKeys.length > 0) {
+if (__DEV__ && missingKeys.length > 0) {
   console.warn('Missing Firebase config keys:', missingKeys);
 }
 
@@ -60,9 +61,7 @@ if (Platform.OS === 'web') {
         isTokenAutoRefreshEnabled: true,
       });
     } catch (error) {
-      if (__DEV__) {
-        console.warn('Firebase App Check initialization failed on web:', error);
-      }
+      logServiceError('Firebase.appCheck', error);
     }
   } else {
     if (__DEV__) {

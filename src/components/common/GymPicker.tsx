@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { searchGyms, saveGymToDatabase, getPlaceDetails, Gym } from '../../services/gymService';
 import { useAuthStore } from '../../store';
+import { logServiceError } from '../../utils/error';
 
 // Fallback gyms when database is empty or offline
 // might not need this
@@ -71,8 +72,8 @@ export const GymPicker: React.FC<GymPickerProps> = ({
             longitude: location.coords.longitude,
           });
         }
-      } catch (e) {
-        console.log('Location permission not granted');
+      } catch (error) {
+        logServiceError('GymPicker.requestLocation', error);
       }
     })();
   }, []);
@@ -118,7 +119,7 @@ export const GymPicker: React.FC<GymPickerProps> = ({
         }
       }
     } catch (error) {
-      console.error('Error loading gyms:', error);
+      logServiceError('GymPicker.loadGyms', error);
       // Use fallback on error
       const fallbackFiltered = FALLBACK_GYMS.filter(g => g.type === locationType);
       setGyms(fallbackFiltered);
@@ -158,7 +159,7 @@ export const GymPicker: React.FC<GymPickerProps> = ({
           onSelect(gymWithDetails.name, gym.id);
         }
       } catch (error) {
-        console.error('Error fetching place details:', error);
+        logServiceError('GymPicker.handleSelect', error);
         onSelect(gym.name, gym.id);
       } finally {
         setIsLoading(false);

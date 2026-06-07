@@ -50,6 +50,12 @@ export interface PlaceAutocompleteResult {
 // The collection for gyms in Firestore
 const GYMS_COLLECTION = 'gyms';
 
+const logDebugWarning = (message: string): void => {
+  if (__DEV__) {
+    console.warn(message);
+  }
+};
+
 /**
  * Get all gym names in a given city (searches Firestore + fallback list)
  * Returns an array of gym names (lowercased) for matching against user homeGym
@@ -273,7 +279,7 @@ const searchWithJavaScriptAPI = async (
     
     const google = (window as any).google;
     if (!google?.maps?.places) {
-      console.warn('Google Maps Places library not available');
+      logDebugWarning('Google Maps Places library not available');
       return [];
     }
     
@@ -326,15 +332,11 @@ const searchWithJavaScriptAPI = async (
         if (newApiError?.message?.includes('ExpiredKey') || 
             newApiError?.message?.includes('InvalidKey') ||
             newApiError?.message?.includes('API key')) {
-          if (__DEV__) {
-            console.warn('Google Maps API key issue');
-          }
+          logDebugWarning('Google Maps API key issue');
           // Don't fall back, just return empty results since the key is invalid
           return [];
         }
-        if (__DEV__) {
-          console.warn('New Places API error, falling back to legacy');
-        }
+        logDebugWarning('New Places API error, falling back to legacy');
         // Fall through to legacy API
       }
     }
@@ -353,7 +355,7 @@ const searchWithJavaScriptAPI = async (
       
       service.getPlacePredictions(request, (predictions: any[], status: string) => {
         if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
-          console.warn('Places autocomplete error:', status);
+          logDebugWarning(`Places autocomplete error: ${status}`);
           resolve([]);
           return;
         }
@@ -382,9 +384,7 @@ const searchWithJavaScriptAPI = async (
     if (error?.message?.includes('ExpiredKey') || 
         error?.message?.includes('InvalidKey') ||
         error?.message?.includes('API key')) {
-      if (__DEV__) {
-        console.warn('Google Maps API key issue');
-      }
+      logDebugWarning('Google Maps API key issue');
     } else {
       logServiceError('GymService.searchWithJavaScriptAPI', error);
     }
@@ -407,7 +407,7 @@ const searchWithRestAPI = async (
   const data = await response.json();
   
   if (data.status !== 'OK' || !data.predictions) {
-    console.warn('Google Places API error:', data.status);
+    logDebugWarning(`Google Places API error: ${data.status}`);
     return [];
   }
   
@@ -491,9 +491,7 @@ const getPlaceDetailsWithJavaScriptAPI = async (
           } : undefined,
         };
       } catch (newApiError) {
-        if (__DEV__) {
-          console.warn('New Place API error, falling back to legacy');
-        }
+        logDebugWarning('New Place API error, falling back to legacy');
         // Fall through to legacy API
       }
     }
@@ -627,7 +625,7 @@ export const saveGymToDatabase = async (
       updatedAt: serverTimestamp(),
     });
     
-    console.log('Gym saved to database:', newGym.name);
+    logDebugWarning('Gym saved to database');
     return {
       ...newGym,
       createdAt: new Date(),
@@ -658,7 +656,7 @@ export const updateGymCoordinates = async (
     if (state) updateData.state = state;
     
     await setDoc(gymRef, updateData, { merge: true });
-    console.log('Updated gym coordinates:', gymId, location);
+    logDebugWarning('Updated gym coordinates');
   } catch (error) {
     logServiceError('GymService.updateGymCoordinates', error);
   }

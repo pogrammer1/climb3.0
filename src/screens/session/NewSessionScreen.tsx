@@ -8,6 +8,7 @@ import { Button, Input, Card, GymPicker, AddClimbModal, ClimbFormData as AddClim
 import { useAuthStore, useSessionStore } from '../../store';
 import { SessionFormData, ClimbFormData, ClimbingType, AttemptResult } from '../../types';
 import { showAlert } from '../../utils/alert';
+import { logServiceError } from '../../utils/error';
 
 // Web-compatible DateTimePicker component
 const DateTimePicker = ({ value, mode, onChange, maximumDate }: any) => {
@@ -129,7 +130,7 @@ export const NewSessionScreen: React.FC<NewSessionScreenProps> = ({ navigation }
         showAlert('Error', 'Failed to create session. Please try again.');
       }
     } catch (error) {
-      console.error('Create session error:', error);
+      logServiceError('NewSessionScreen.createSession', error);
       showAlert('Error', 'Failed to create session. Please try again.');
     } finally {
       setSaving(false);

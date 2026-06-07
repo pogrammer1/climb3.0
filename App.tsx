@@ -15,6 +15,7 @@ import {
 } from '@expo/vector-icons';
 import { AppNavigator } from './src/navigation';
 import { lightTheme } from './src/constants/theme';
+import { logServiceError } from './src/utils/error';
 
 // Keep splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -34,7 +35,12 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('App Error:', error, errorInfo);
+    logServiceError('App.ErrorBoundary', { code: error.name, message: error.message });
+    if (__DEV__) {
+      logServiceError('App.ErrorBoundary.componentStack', {
+        message: errorInfo.componentStack || 'No component stack available',
+      });
+    }
   }
 
   render() {
@@ -42,7 +48,11 @@ class ErrorBoundary extends React.Component<
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Something went wrong</Text>
-          <Text style={styles.errorMessage}>{this.state.error?.message}</Text>
+          <Text style={styles.errorMessage}>
+            {__DEV__ && this.state.error?.message
+              ? this.state.error.message
+              : 'Please refresh the app and try again.'}
+          </Text>
         </View>
       );
     }
@@ -92,12 +102,9 @@ export default function App() {
             ...Ionicons.font,
             ...FontAwesome.font,
           });
-          console.log('Fonts loaded successfully');
-        } else {
-          console.log('Web platform - fonts loaded via CSS');
         }
       } catch (e) {
-        console.warn('Error loading fonts:', e);
+        logServiceError('App.loadFonts', e);
       } finally {
         setAppIsReady(true);
       }

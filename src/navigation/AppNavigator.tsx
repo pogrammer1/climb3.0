@@ -10,6 +10,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { RootNavigator } from './RootNavigator';
 import { LoadingSpinner, NotificationProvider } from '../components/common';
 import { AppStackParamList } from './types';
+import { logServiceError } from '../utils/error';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
@@ -31,7 +32,7 @@ export const AppNavigator: React.FC = () => {
             setProfile(null);
           }
         } catch (error) {
-          console.error('Error fetching profile:', error);
+          logServiceError('AppNavigator.fetchProfile', error);
           setProfile(null);
         }
       } else {

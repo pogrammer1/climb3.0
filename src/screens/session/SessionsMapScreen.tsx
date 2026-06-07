@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore, useSessionStore } from '../../store';
 import { getVisitedLocations, VisitedLocation, clearGeocodeCache } from '../../services/locationMapService';
+import { logServiceError } from '../../utils/error';
 import { format } from 'date-fns';
 
 // Import WebMapView only on web platform
@@ -52,15 +53,17 @@ export const SessionsMapScreen: React.FC<SessionsMapScreenProps> = ({ navigation
           existing.push(loc.name);
           coordCounts.set(key, existing);
         });
-        coordCounts.forEach((names, coords) => {
-          if (names.length > 1) {
-            console.warn(`⚠️ Duplicate coordinates ${coords} for: ${names.join(', ')}`);
+        coordCounts.forEach((names) => {
+          if (__DEV__ && names.length > 1) {
+            logServiceError('SessionsMapScreen.duplicateCoordinates', {
+              message: `Duplicate coordinate group detected (${names.length} locations).`,
+            });
           }
         });
         
         setVisitedLocations(locations);
       } catch (error) {
-        console.error('Error loading visited locations:', error);
+        logServiceError('SessionsMapScreen.loadLocations', error);
       } finally {
         setIsLoading(false);
       }

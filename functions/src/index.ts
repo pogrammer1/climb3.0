@@ -70,6 +70,25 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function safeErrorDetails(error: unknown): { code?: string; name?: string } {
+  if (!error || typeof error !== "object") {
+    return {};
+  }
+
+  const details: { code?: string; name?: string } = {};
+  const maybeError = error as { code?: unknown; name?: unknown };
+
+  if (typeof maybeError.code === "string" && maybeError.code.trim()) {
+    details.code = maybeError.code;
+  }
+
+  if (typeof maybeError.name === "string" && maybeError.name.trim()) {
+    details.name = maybeError.name;
+  }
+
+  return details;
+}
+
 async function enforceRateLimit(
   userId: string,
   action: string,
@@ -202,10 +221,7 @@ export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Pr
       throw error;
     }
 
-    logger.error("sendMatchRequest callable failed", {
-      code: (error as { code?: string })?.code,
-      message: (error as { message?: string })?.message || "Unknown error",
-    });
+    logger.error("sendMatchRequest callable failed", safeErrorDetails(error));
 
     throw new HttpsError("internal", "Failed to send match request.");
   }
@@ -238,10 +254,7 @@ async function getUserEmail(userId: string): Promise<string | null> {
     const user = await admin.auth().getUser(userId);
     return user.email || null;
   } catch (error) {
-    logger.error("Error getting user email", {
-      code: (error as { code?: string })?.code,
-      message: (error as { message?: string })?.message || "Unknown error",
-    });
+    logger.error("Error getting user email", safeErrorDetails(error));
     return null;
   }
 }
@@ -269,10 +282,7 @@ async function getUserProfile(userId: string): Promise<UserProfile | null> {
     }
     return null;
   } catch (error) {
-    logger.error("Error getting profile", {
-      code: (error as { code?: string })?.code,
-      message: (error as { message?: string })?.message || "Unknown error",
-    });
+    logger.error("Error getting profile", safeErrorDetails(error));
     return null;
   }
 }
@@ -314,10 +324,7 @@ async function sendEmail(
     logger.info("Email notification sent successfully");
     return true;
   } catch (error) {
-    logger.error("Error sending email notification", {
-      code: (error as { code?: string })?.code,
-      message: (error as { message?: string })?.message || "Unknown error",
-    });
+    logger.error("Error sending email notification", safeErrorDetails(error));
     return false;
   }
 }
@@ -741,10 +748,7 @@ async function incrementPublicStats(userId: string, fields: Record<string, any>)
 
     await profileRef.set(updatePayload, { merge: true });
   } catch (err) {
-    logger.error("Error incrementing public stats", {
-      code: (err as { code?: string })?.code,
-      message: (err as { message?: string })?.message || "Unknown error",
-    });
+    logger.error("Error incrementing public stats", safeErrorDetails(err));
   }
 }
 
@@ -762,10 +766,7 @@ async function setHighestVGradeIfHigher(userId: string, newGrade: number) {
       }
     });
   } catch (err) {
-    logger.error("Error setting highest V grade", {
-      code: (err as { code?: string })?.code,
-      message: (err as { message?: string })?.message || "Unknown error",
-    });
+    logger.error("Error setting highest V grade", safeErrorDetails(err));
   }
 }
 
@@ -1120,7 +1121,7 @@ export const geocodeLocation = onRequest(
         res.json({ latitude: null, longitude: null });
       }
     } catch (error) {
-      logger.error("Geocoding error:", error);
+      logger.error("Geocoding error", safeErrorDetails(error));
       res.status(500).json({ error: "Geocoding failed" });
     }
   }

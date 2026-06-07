@@ -11,6 +11,7 @@ import { saveProfile, uploadProfilePhoto } from '../../services/profileService';
 import { UserProfile, ExperienceLevel, ClimbingType, YDSGrade, BoulderingGrade, EmailNotificationType } from '../../types';
 import { EXPERIENCE_LEVELS, CLIMBING_TYPES } from '../../constants';
 import { showAlert } from '../../utils/alert';
+import { logServiceError } from '../../utils/error';
 
 // Email notification type options
 const EMAIL_NOTIFICATION_TYPES: { value: EmailNotificationType; label: string; description: string }[] = [
@@ -94,12 +95,14 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
             showAlert('Error', response.error || 'Failed to upload photo');
           }
         } catch (error) {
+          logServiceError('EditProfileScreen.uploadProfilePhoto', error);
           showAlert('Error', 'Failed to upload photo');
         } finally {
           setUploading(false);
         }
       }
     } catch (error) {
+      logServiceError('EditProfileScreen.pickImage', error);
       showAlert('Error', 'Failed to access photos');
     }
   };
@@ -135,7 +138,6 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
 
     setLoading(true);
     try {
-      console.log('Saving profile for user:', user.uid);
       const isNewProfile = !profile;
       const result = await saveProfile(user.uid, {
         displayName: formData.displayName.trim(),
@@ -154,18 +156,15 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({ navigation
         emailNotificationTypes: formData.emailNotificationTypes,
       }, isNewProfile);
 
-      console.log('Save result:', result);
-
       if (result.success && result.data) {
         setProfile(result.data);
         showAlert('Success', 'Profile updated successfully!');
         navigation.goBack();
       } else {
-        console.error('Save failed:', result.error);
         showAlert('Error', result.error || 'Failed to update profile');
       }
     } catch (error) {
-      console.error('Save error:', error);
+      logServiceError('EditProfileScreen.saveProfile', error);
       showAlert('Error', 'Failed to update profile');
     } finally {
       setLoading(false);

@@ -9,6 +9,7 @@ import { useSessionStore, useAuthStore } from '../../store';
 import { ClimbingSession, Climb, ClimbingType, ClimbFormData, AttemptResult } from '../../types';
 import { format } from 'date-fns';
 import { showAlert } from '../../utils/alert';
+import { logServiceError } from '../../utils/error';
 
 interface SessionDetailScreenProps {
   navigation: any;
@@ -61,7 +62,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
           showAlert('Error', 'Failed to delete session. Please try again.');
         }
       } catch (error) {
-        console.error('Delete error:', error);
+        logServiceError('SessionDetailScreen.deleteSession', error);
         showAlert('Error', 'Failed to delete session');
       }
     }
@@ -76,6 +77,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
       }
       setAddClimbModalVisible(false);
     } catch (error) {
+      logServiceError('SessionDetailScreen.addClimb', error);
       showAlert('Error', 'Failed to add climb');
     }
   };
@@ -104,6 +106,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
         showAlert('Error', 'Failed to update climb');
       }
     } catch (error) {
+      logServiceError('SessionDetailScreen.updateClimb', error);
       showAlert('Error', 'Failed to update climb');
     }
   };
@@ -128,6 +131,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({ naviga
         }
         setClimbMenuVisible(null);
       } catch (error) {
+        logServiceError('SessionDetailScreen.deleteClimb', error);
         showAlert('Error', 'Failed to delete climb');
       }
     }

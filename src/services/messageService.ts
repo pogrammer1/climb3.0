@@ -406,7 +406,7 @@ export const subscribeToMessages = (
     },
     (error) => {
       // Handle permission errors gracefully (e.g., user logged out)
-      console.warn('[MessageService] Messages subscription error:', error.code || error.message);
+      logServiceError('MessageService.subscribeToMessages', error);
     }
   );
 };
@@ -446,7 +446,7 @@ export const subscribeToConversations = (
     },
     (error) => {
       // Handle permission errors gracefully (e.g., user logged out)
-      console.warn('[MessageService] Conversation subscription error:', error.code || error.message);
+      logServiceError('MessageService.subscribeToConversations', error);
     }
   );
 };

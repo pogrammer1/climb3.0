@@ -13,6 +13,7 @@ import { showAlert } from '../../utils/alert';
 import { getProfile } from '../../services/profileService';
 import { getOrCreateConversation } from '../../services/messageService';
 import { sendVerificationEmail } from '../../services/authService';
+import { logServiceError } from '../../utils/error';
 
 interface PendingRequestWithProfile {
   id: string;
@@ -232,6 +233,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
         showAlert('Request Failed', 'Could not send connection request. You may have already sent a request to this climber.');
       }
     } catch (error) {
+      logServiceError('DiscoverScreen.sendRequest', error);
       showAlert('Error', 'Failed to send connection request.');
     } finally {
       setSendingRequestTo(null);
@@ -253,7 +255,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
         showAlert('Error', 'Could not open conversation.');
       }
     } catch (error) {
-      console.error('Error opening conversation:', error);
+      logServiceError('DiscoverScreen.openConversation', error);
       showAlert('Error', 'Failed to open conversation.');
     }
   };

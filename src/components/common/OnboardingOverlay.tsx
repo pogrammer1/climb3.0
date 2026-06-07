@@ -11,6 +11,7 @@ import { Text, useTheme } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { logServiceError } from '../../utils/error';
 
 const ONBOARDING_KEY = '@climb_onboarding_complete';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -68,7 +69,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({ onComplete
         setTimeout(() => setIsVisible(true), 500);
       }
     } catch (error) {
-      console.error('Error checking onboarding status:', error);
+      logServiceError('OnboardingOverlay.checkStatus', error);
     }
   };
 
@@ -104,7 +105,7 @@ export const OnboardingOverlay: React.FC<OnboardingOverlayProps> = ({ onComplete
         onComplete?.();
       });
     } catch (error) {
-      console.error('Error saving onboarding status:', error);
+      logServiceError('OnboardingOverlay.complete', error);
       setIsVisible(false);
     }
   };

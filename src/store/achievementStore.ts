@@ -9,6 +9,7 @@ import {
   getAchievementsByCategory,
 } from '../services/achievementService';
 import { AchievementProgress, UserAchievement, UserAchievementStats, AchievementDefinition } from '../types';
+import { logServiceError } from '../utils/error';
 
 interface AchievementState {
   // State
@@ -86,7 +87,7 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
         set({ userAchievements: result.data });
       }
     } catch (error) {
-      console.error('Error fetching user achievements:', error);
+      logServiceError('AchievementStore.fetchUserAchievements', error);
     }
   },
   
@@ -165,7 +166,7 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
         ),
       }));
     } catch (error) {
-      console.error('Error marking achievement as notified:', error);
+      logServiceError('AchievementStore.markAsNotified', error);
     }
   },
   

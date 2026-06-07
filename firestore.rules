@@ -40,6 +40,149 @@ service cloud.firestore {
     function preservesFields(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
+
+    function textOrNull(value, maxLength) {
+      return value == null || (value is string && value.size() <= maxLength);
+    }
+
+    function validUserDoc(userId) {
+      return request.resource.data.keys().hasOnly([
+               'uid',
+               'email',
+               'displayName',
+               'photoURL',
+               'emailVerified',
+               'createdAt',
+               'lastLoginAt',
+               'updatedAt'
+             ]) &&
+             request.resource.data.uid == userId &&
+             textOrNull(request.resource.data.email, 254) &&
+             textOrNull(request.resource.data.displayName, 80) &&
+             textOrNull(request.resource.data.photoURL, 2000);
+    }
+
+    function validProfileDoc(userId) {
+      return request.resource.data.keys().hasOnly([
+               'uid',
+               'email',
+               'displayName',
+               'photoURL',
+               'bio',
+               'location',
+               'geoPoint',
+               'experienceLevel',
+               'climbingTypes',
+               'highestGradeYDS',
+               'highestGradeBouldering',
+               'preferredClimbingStyle',
+               'partnerPreferences',
+               'availableDays',
+               'availableTimes',
+               'homeGym',
+               'city',
+               'favoriteOutdoorAreas',
+               'yearsClimbing',
+               'certifications',
+               'isProfileComplete',
+               'isSearchable',
+               'emailNotifications',
+               'emailNotificationTypes',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             request.resource.data.uid == userId &&
+             textOrNull(request.resource.data.email, 254) &&
+             textOrNull(request.resource.data.displayName, 80) &&
+             textOrNull(request.resource.data.photoURL, 2000) &&
+             textOrNull(request.resource.data.bio, 1000) &&
+             textOrNull(request.resource.data.preferredClimbingStyle, 120) &&
+             textOrNull(request.resource.data.homeGym, 160) &&
+             textOrNull(request.resource.data.city, 120) &&
+             (request.resource.data.yearsClimbing == null ||
+               (request.resource.data.yearsClimbing is number &&
+                request.resource.data.yearsClimbing >= 0 &&
+                request.resource.data.yearsClimbing <= 80));
+    }
+
+    function validSessionDoc(userId) {
+      return request.resource.data.keys().hasOnly([
+               'userId',
+               'date',
+               'location',
+               'locationType',
+               'duration',
+               'notes',
+               'photos',
+               'climbs',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             request.resource.data.userId == userId &&
+             textOrNull(request.resource.data.location, 160) &&
+             textOrNull(request.resource.data.notes, 2000) &&
+             request.resource.data.locationType in ['indoor', 'outdoor'] &&
+             request.resource.data.duration is number &&
+             request.resource.data.duration >= 0 &&
+             request.resource.data.duration <= 1440;
+    }
+
+    function validClimbDoc(sessionId) {
+      return request.resource.data.keys().hasOnly([
+               'sessionId',
+               'name',
+               'grade',
+               'gradeSystem',
+               'climbingType',
+               'result',
+               'attempts',
+               'notes',
+               'rating',
+               'photos',
+               'createdAt'
+             ]) &&
+             request.resource.data.sessionId == sessionId &&
+             textOrNull(request.resource.data.name, 160) &&
+             textOrNull(request.resource.data.grade, 20) &&
+             textOrNull(request.resource.data.climbingType, 80) &&
+             textOrNull(request.resource.data.result, 40) &&
+             textOrNull(request.resource.data.notes, 2000) &&
+             request.resource.data.gradeSystem in ['yds', 'v-scale'] &&
+             request.resource.data.attempts is number &&
+             request.resource.data.attempts >= 0 &&
+             request.resource.data.attempts <= 100 &&
+             request.resource.data.rating is number &&
+             request.resource.data.rating >= 0 &&
+             request.resource.data.rating <= 5;
+    }
+
+    function validScheduleDoc(userId) {
+      return request.resource.data.keys().hasOnly([
+               'userId',
+               'schedule',
+               'preferredGyms',
+               'notes',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             request.resource.data.userId == userId &&
+             textOrNull(request.resource.data.notes, 1000);
+    }
+
+    function validMessageDoc(conversationId) {
+      return request.resource.data.keys().hasOnly([
+               'conversationId',
+               'senderId',
+               'text',
+               'imageUrl',
+               'readBy',
+               'createdAt'
+             ]) &&
+             request.resource.data.conversationId == conversationId &&
+             request.resource.data.senderId == authUid() &&
+             textOrNull(request.resource.data.text, 2000) &&
+             textOrNull(request.resource.data.imageUrl, 2000);
+    }
     
     // Users collection
     match /users/{userId} {
@@ -47,8 +190,11 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       
       // Only the user can write their own profile
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      allow create: if isOwner(userId) && validUserDoc(userId);
+      allow update: if isOwner(userId) &&
+                      validUserDoc(userId) &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isOwner(userId);
     }
     
@@ -58,8 +204,11 @@ service cloud.firestore {
       allow read: if isOwner(userId) || hasVerifiedEmail();
       
       // Only the user can write their own profile
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      allow create: if isOwner(userId) && validProfileDoc(userId);
+      allow update: if isOwner(userId) &&
+                      validProfileDoc(userId) &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isOwner(userId);
       
       // Achievements subcollection
@@ -91,11 +240,16 @@ service cloud.firestore {
       
       // Users can create sessions for themselves
       allow create: if isAuthenticated() && 
-                      request.resource.data.userId == authUid();
+                      validSessionDoc(authUid());
       
       // Users can update/delete their own sessions
-      allow update, delete: if isAuthenticated() && 
-                              resource.data.userId == authUid();
+      allow update: if isAuthenticated() &&
+                      resource.data.userId == authUid() &&
+                      validSessionDoc(authUid()) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAuthenticated() &&
+                      resource.data.userId == authUid();
     }
     
     // Climbs collection (individual climbs within sessions)
@@ -105,10 +259,14 @@ service cloud.firestore {
 
       // Users can only create climbs for their own sessions
       allow create: if request.resource.data.sessionId is string &&
-                      isSessionOwner(request.resource.data.sessionId);
+                      isSessionOwner(request.resource.data.sessionId) &&
+                      validClimbDoc(request.resource.data.sessionId);
 
       // Users can only update/delete climbs tied to sessions they own
-      allow update, delete: if isSessionOwner(resource.data.sessionId);
+      allow update: if isSessionOwner(resource.data.sessionId) &&
+                      validClimbDoc(resource.data.sessionId) &&
+                      request.resource.data.sessionId == resource.data.sessionId;
+      allow delete: if isSessionOwner(resource.data.sessionId);
     }
     
     // Matches collection
@@ -196,18 +354,9 @@ service cloud.firestore {
         // Participants can send messages
         allow create: if hasVerifiedEmail() && 
                         authUid() in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
-                        request.resource.data.senderId == authUid() &&
-                        request.resource.data.conversationId == conversationId &&
+                        validMessageDoc(conversationId) &&
                         request.resource.data.readBy.size() == 1 &&
-                        authUid() in request.resource.data.readBy &&
-                        request.resource.data.keys().hasOnly([
-                          'conversationId',
-                          'senderId',
-                          'text',
-                          'imageUrl',
-                          'readBy',
-                          'createdAt'
-                        ]);
+                        authUid() in request.resource.data.readBy;
         
         // Participants can update messages (for read receipts) or sender can edit their message
         allow update: if hasVerifiedEmail() && 
@@ -319,8 +468,11 @@ service cloud.firestore {
       allow read: if isOwner(userId) || hasVerifiedEmail();
       
       // Only the user can write their own schedule
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      allow create: if isOwner(userId) && validScheduleDoc(userId);
+      allow update: if isOwner(userId) &&
+                      validScheduleDoc(userId) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isOwner(userId);
     }
   }

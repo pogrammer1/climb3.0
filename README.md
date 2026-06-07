@@ -23,6 +23,7 @@ A cross-platform (iOS, Android, Web) application for rock climbers to log sessio
 - Copy `.env.example` to `.env` for local Expo/web development. Values prefixed with `EXPO_PUBLIC_` are bundled into the client and must be treated as public; restrict browser API keys by domain/API in their provider consoles.
 - Copy `functions/.env.example` to `functions/.env` for local Functions emulator work. Do not commit real SMTP credentials.
 - Production email notifications read `SMTP_PASS` from Firebase Secret Manager. Set or rotate it with `firebase functions:secrets:set SMTP_PASS` before deploying Functions.
+- To clean legacy profile PII before release, run `npm run cleanup:profile-pii:dry-run` from `functions/`, then `npm run cleanup:profile-pii -- --execute` after confirming the count.
 - Keep App Check debug tokens out of production hosting builds. Use `EXPO_PUBLIC_FIREBASE_APPCHECK_WEB_RECAPTCHA_SITE_KEY` for web App Check.
 
 ## License

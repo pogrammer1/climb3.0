@@ -8,7 +8,9 @@
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "cleanup:profile-pii:dry-run": "node scripts/cleanup-profile-pii.cjs",
+    "cleanup:profile-pii": "node scripts/cleanup-profile-pii.cjs"
   },
   "engines": {
     "node": "24"

@@ -12,7 +12,7 @@
     "deploy": "npm run build:web && firebase deploy --only hosting",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "test": "jest",
+    "test": "npm run test:rules",
     "test:watch": "jest --watch",
     "test:rules": "npx firebase emulators:exec --only firestore,storage \"jest --config jest.rules.config.cjs\"",
     "type-check": "tsc --noEmit"

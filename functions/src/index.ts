@@ -61,6 +61,15 @@ type SendMatchRequestResult = {
   updatedAt: number;
 };
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function enforceRateLimit(
   userId: string,
   action: string,
@@ -118,6 +127,10 @@ async function enforceRateLimit(
 export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Promise<SendMatchRequestResult> => {
   if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "You must be signed in to send match requests.");
+  }
+
+  if (request.auth.token.email_verified !== true) {
+    throw new HttpsError("failed-precondition", "Please verify your email before sending match requests.");
   }
 
   const userId = request.auth.uid;
@@ -192,7 +205,6 @@ export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Pr
     logger.error("sendMatchRequest callable failed", {
       code: (error as { code?: string })?.code,
       message: (error as { message?: string })?.message || "Unknown error",
-      uid: userId,
     });
 
     throw new HttpsError("internal", "Failed to send match request.");
@@ -226,7 +238,10 @@ async function getUserEmail(userId: string): Promise<string | null> {
     const user = await admin.auth().getUser(userId);
     return user.email || null;
   } catch (error) {
-    logger.error(`Error getting user email for ${userId}:`, error);
+    logger.error("Error getting user email", {
+      code: (error as { code?: string })?.code,
+      message: (error as { message?: string })?.message || "Unknown error",
+    });
     return null;
   }
 }
@@ -254,7 +269,10 @@ async function getUserProfile(userId: string): Promise<UserProfile | null> {
     }
     return null;
   } catch (error) {
-    logger.error(`Error getting profile for ${userId}:`, error);
+    logger.error("Error getting profile", {
+      code: (error as { code?: string })?.code,
+      message: (error as { message?: string })?.message || "Unknown error",
+    });
     return null;
   }
 }
@@ -293,10 +311,13 @@ async function sendEmail(
     if (replyTo) mailOptions.replyTo = replyTo;
 
     await transporter.sendMail(mailOptions);
-    logger.info(`Email sent successfully to ${to}`);
+    logger.info("Email notification sent successfully");
     return true;
   } catch (error) {
-    logger.error(`Error sending email to ${to}:`, error);
+    logger.error("Error sending email notification", {
+      code: (error as { code?: string })?.code,
+      message: (error as { message?: string })?.message || "Unknown error",
+    });
     return false;
   }
 }
@@ -308,6 +329,9 @@ function newMessageEmailTemplate(
   senderName: string,
   messagePreview: string
 ): string {
+  const safeSenderName = escapeHtml(senderName);
+  const safeMessagePreview = escapeHtml(messagePreview);
+
   return `
     <!DOCTYPE html>
     <html>
@@ -354,9 +378,9 @@ function newMessageEmailTemplate(
         </div>
         <div class="content">
           <h2>Hey there!</h2>
-          <p>You have a new message from <strong>${senderName}</strong>:</p>
+          <p>You have a new message from <strong>${safeSenderName}</strong>:</p>
           <div class="message-box">
-            <p>${messagePreview}</p>
+            <p>${safeMessagePreview}</p>
           </div>
           <a href="https://belay-91a94.web.app" class="button">Open Belay</a>
         </div>
@@ -374,6 +398,8 @@ function newMessageEmailTemplate(
  * Email template for new connection request
  */
 function connectionRequestEmailTemplate(requesterName: string): string {
+  const safeRequesterName = escapeHtml(requesterName);
+
   return `
     <!DOCTYPE html>
     <html>
@@ -422,7 +448,7 @@ function connectionRequestEmailTemplate(requesterName: string): string {
           <h2>Someone wants to climb with you!</h2>
           <div class="highlight">
             <p style="font-size: 18px;">
-              <strong>${requesterName}</strong> wants to connect with you.
+              <strong>${safeRequesterName}</strong> wants to connect with you.
             </p>
             <p>Check out their profile and decide if you want to climb together!</p>
           </div>
@@ -442,6 +468,8 @@ function connectionRequestEmailTemplate(requesterName: string): string {
  * Email template for connection accepted
  */
 function connectionAcceptedEmailTemplate(accepterName: string): string {
+  const safeAccepterName = escapeHtml(accepterName);
+
   return `
     <!DOCTYPE html>
     <html>
@@ -490,7 +518,7 @@ function connectionAcceptedEmailTemplate(accepterName: string): string {
           <h2>Great news!</h2>
           <div class="highlight">
             <p style="font-size: 18px;">
-              <strong>${accepterName}</strong> accepted your connection request!
+              <strong>${safeAccepterName}</strong> accepted your connection request!
             </p>
             <p>You can now message each other and plan your climbing sessions.</p>
           </div>
@@ -538,7 +566,7 @@ export const onNewMessage = onDocumentCreated(
     const {senderId, text} = messageData;
     const conversationId = event.params.conversationId;
 
-    logger.info(`New message in conversation ${conversationId} from ${senderId}`);
+    logger.info("New message notification trigger received");
 
     // Get conversation to find recipient
     const conversationDoc = await db
@@ -547,7 +575,7 @@ export const onNewMessage = onDocumentCreated(
       .get();
 
     if (!conversationDoc.exists) {
-      logger.warn(`Conversation ${conversationId} not found`);
+      logger.warn("Conversation for message notification was not found");
       return;
     }
 
@@ -564,14 +592,14 @@ export const onNewMessage = onDocumentCreated(
     // Check if recipient has email notifications enabled for messages
     const recipientProfile = await getUserProfile(recipientId);
     if (!recipientProfile || !wantsNotificationType(recipientProfile, "messages")) {
-      logger.info(`User ${recipientId} has message notifications disabled`);
+      logger.info("Recipient has message notifications disabled");
       return;
     }
 
     // Get recipient email
     const recipientEmail = await getUserEmail(recipientId);
     if (!recipientEmail) {
-      logger.warn(`No email found for user ${recipientId}`);
+      logger.warn("Recipient email was not available");
       return;
     }
 
@@ -613,19 +641,19 @@ export const onNewConnectionRequest = onDocumentCreated(
       return;
     }
 
-    logger.info(`New connection request from ${userId} to ${matchedUserId}`);
+    logger.info("New connection request notification trigger received");
 
     // Check if recipient has connection notifications enabled
     const recipientProfile = await getUserProfile(matchedUserId);
     if (!recipientProfile || !wantsNotificationType(recipientProfile, "connections")) {
-      logger.info(`User ${matchedUserId} has connection notifications disabled`);
+      logger.info("Recipient has connection notifications disabled");
       return;
     }
 
     // Get recipient email
     const recipientEmail = await getUserEmail(matchedUserId);
     if (!recipientEmail) {
-      logger.warn(`No email found for user ${matchedUserId}`);
+      logger.warn("Recipient email was not available");
       return;
     }
 
@@ -663,18 +691,18 @@ export const onConnectionAccepted = onDocumentUpdated(
     if (beforeData.status !== "accepted" && afterData.status === "accepted") {
       const {userId, matchedUserId} = afterData;
 
-      logger.info(`Connection accepted: ${userId} <-> ${matchedUserId}`);
+      logger.info("Connection accepted notification trigger received");
 
       // The userId is the original requester, notify them
       const requesterProfile = await getUserProfile(userId);
       if (!requesterProfile || !wantsNotificationType(requesterProfile, "connections")) {
-        logger.info(`User ${userId} has connection notifications disabled`);
+        logger.info("Requester has connection notifications disabled");
         return;
       }
 
       const requesterEmail = await getUserEmail(userId);
       if (!requesterEmail) {
-        logger.warn(`No email found for user ${userId}`);
+        logger.warn("Requester email was not available");
         return;
       }
 
@@ -713,7 +741,10 @@ async function incrementPublicStats(userId: string, fields: Record<string, any>)
 
     await profileRef.set(updatePayload, { merge: true });
   } catch (err) {
-    logger.error("Error incrementing public stats for", userId, err);
+    logger.error("Error incrementing public stats", {
+      code: (err as { code?: string })?.code,
+      message: (err as { message?: string })?.message || "Unknown error",
+    });
   }
 }
 
@@ -731,7 +762,10 @@ async function setHighestVGradeIfHigher(userId: string, newGrade: number) {
       }
     });
   } catch (err) {
-    logger.error("Error setting highest V grade for", userId, err);
+    logger.error("Error setting highest V grade", {
+      code: (err as { code?: string })?.code,
+      message: (err as { message?: string })?.message || "Unknown error",
+    });
   }
 }
 
@@ -904,11 +938,11 @@ export const onProfileWriteAgg = onDocumentUpdated(
       before?.highestGradeYDS !== after.highestGradeYDS;
     
     if (!relevantFieldsChanged) {
-      logger.info(`Skipping onProfileWriteAgg for ${userId} - no relevant fields changed`);
+      logger.info("Skipping profile stats aggregation; no relevant fields changed");
       return;
     }
 
-    logger.info(`Processing profile update for ${userId}`);
+    logger.info("Processing profile stats aggregation");
 
     // createdAt -> store if present and changed
     if (after.createdAt && before?.createdAt !== after.createdAt) {
@@ -1028,7 +1062,7 @@ export const backfillPublicStats = onRequest(
         );
 
       updated++;
-      logger.info(`Backfilled publicStats for ${userId}`);
+      logger.info("Backfilled publicStats for one profile");
     }
 
     const msg = `Backfill complete. Updated: ${updated}, Skipped (already had publicStats): ${skipped}`;

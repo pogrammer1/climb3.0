@@ -14,7 +14,8 @@ const TEXT_DATA_URL = 'data:text/plain;base64,bm90LWFuLWltYWdl';
 
 describe('Security rules', () => {
   let testEnv;
-  const authedContext = (uid) => testEnv.authenticatedContext(uid);
+  const authedContext = (uid, verified = true) =>
+    testEnv.authenticatedContext(uid, { email_verified: verified });
 
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
@@ -83,18 +84,36 @@ describe('Security rules', () => {
         updatedAt: new Date(),
       });
 
+      await setDoc(doc(adminDb, 'gyms', 'gym_owned_by_u1'), {
+        id: 'gym_owned_by_u1',
+        name: 'Belay Test Gym',
+        address: '123 Test St',
+        city: 'Austin',
+        state: 'TX',
+        country: 'US',
+        type: 'indoor',
+        category: 'gym',
+        verified: false,
+        addedBy: 'u1',
+        sessionCount: 2,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
       const seededImageRef = adminStorage.ref('chat-images/conv_u1_u2/seed.png');
       await seededImageRef.putString(PNG_DATA_URL, 'data_url');
     });
   });
 
   afterAll(async () => {
-    await testEnv.cleanup();
+    if (testEnv) {
+      await testEnv.cleanup();
+    }
   });
 
   test('climbs: only session owner can read/write climbs', async () => {
-    const u1Db = testEnv.authenticatedContext('u1').firestore();
-    const u2Db = testEnv.authenticatedContext('u2').firestore();
+    const u1Db = authedContext('u1').firestore();
+    const u2Db = authedContext('u2').firestore();
 
     await assertSucceeds(getDoc(doc(u1Db, 'climbs', 'climb_for_u1_session')));
     await assertFails(getDoc(doc(u2Db, 'climbs', 'climb_for_u1_session')));
@@ -117,9 +136,11 @@ describe('Security rules', () => {
   test('potentialMatches: only owner can read/write own document', async () => {
     const u1Db = authedContext('u1').firestore();
     const u2Db = authedContext('u2').firestore();
+    const unverifiedU1Db = authedContext('u1', false).firestore();
 
     await assertSucceeds(getDoc(doc(u1Db, 'potentialMatches', 'pm_u1')));
     await assertFails(getDoc(doc(u2Db, 'potentialMatches', 'pm_u1')));
+    await assertFails(getDoc(doc(unverifiedU1Db, 'potentialMatches', 'pm_u1')));
 
     await assertSucceeds(
       setDoc(doc(u2Db, 'potentialMatches', 'pm_u2'), {
@@ -174,6 +195,7 @@ describe('Security rules', () => {
 
   test('matches: immutable ownership fields cannot be changed', async () => {
     const u1Db = authedContext('u1').firestore();
+    const unverifiedU1Db = authedContext('u1', false).firestore();
 
     await assertSucceeds(
       updateDoc(doc(u1Db, 'matches', 'match_u1_u2'), {
@@ -186,10 +208,13 @@ describe('Security rules', () => {
         matchedUserId: 'u3',
       })
     );
+
+    await assertFails(getDoc(doc(unverifiedU1Db, 'matches', 'match_u1_u2')));
   });
 
   test('messages: participant can update readBy but cannot modify message content/sender', async () => {
     const u2Db = authedContext('u2').firestore();
+    const unverifiedU2Db = authedContext('u2', false).firestore();
 
     await assertSucceeds(
       updateDoc(doc(u2Db, 'conversations', 'conv_u1_u2', 'messages', 'msg1'), {
@@ -206,6 +231,71 @@ describe('Security rules', () => {
     await assertFails(
       updateDoc(doc(u2Db, 'conversations', 'conv_u1_u2', 'messages', 'msg1'), {
         senderId: 'u2',
+      })
+    );
+
+    await assertFails(getDoc(doc(unverifiedU2Db, 'conversations', 'conv_u1_u2', 'messages', 'msg1')));
+  });
+
+  test('gyms: verified users can add gyms and only constrained updates are allowed', async () => {
+    const u1Db = authedContext('u1').firestore();
+    const u2Db = authedContext('u2').firestore();
+    const unverifiedU1Db = authedContext('u1', false).firestore();
+
+    await assertSucceeds(getDoc(doc(unverifiedU1Db, 'gyms', 'gym_owned_by_u1')));
+
+    await assertSucceeds(
+      setDoc(doc(u1Db, 'gyms', 'new_gym_by_u1'), {
+        id: 'new_gym_by_u1',
+        name: 'New Gym',
+        address: '456 Test St',
+        city: 'Austin',
+        state: 'TX',
+        country: 'US',
+        type: 'indoor',
+        category: 'gym',
+        verified: false,
+        addedBy: 'u1',
+        sessionCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+    );
+
+    await assertFails(
+      setDoc(doc(unverifiedU1Db, 'gyms', 'new_gym_unverified'), {
+        id: 'new_gym_unverified',
+        name: 'Nope',
+        address: '456 Test St',
+        city: 'Austin',
+        state: 'TX',
+        country: 'US',
+        type: 'indoor',
+        category: 'gym',
+        verified: false,
+        addedBy: 'u1',
+        sessionCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+    );
+
+    await assertSucceeds(
+      updateDoc(doc(u2Db, 'gyms', 'gym_owned_by_u1'), {
+        sessionCount: 3,
+        updatedAt: new Date(),
+      })
+    );
+
+    await assertFails(
+      updateDoc(doc(u2Db, 'gyms', 'gym_owned_by_u1'), {
+        name: 'Hijacked Gym',
+      })
+    );
+
+    await assertFails(
+      updateDoc(doc(u1Db, 'gyms', 'gym_owned_by_u1'), {
+        verified: true,
       })
     );
   });

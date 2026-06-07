@@ -12,6 +12,7 @@ import { CLIMBING_TYPES, EXPERIENCE_LEVELS } from '../../constants';
 import { showAlert } from '../../utils/alert';
 import { getProfile } from '../../services/profileService';
 import { getOrCreateConversation } from '../../services/messageService';
+import { sendVerificationEmail } from '../../services/authService';
 
 interface PendingRequestWithProfile {
   id: string;
@@ -92,7 +93,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (user) {
+      if (user?.emailVerified) {
         // Only fetch climbers if initial filters have been applied
         if (hasAppliedInitialFilters) {
           fetchClimbers(user.uid, true);
@@ -158,7 +159,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   }, [matchedProfiles]);
 
   const handleRefresh = async () => {
-    if (!user) return;
+    if (!user?.emailVerified) return;
     setRefreshing(true);
     await Promise.all([
       fetchClimbers(user.uid, true),
@@ -172,7 +173,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
   const handleApplyFilters = () => {
     setFilters(tempFilters);
     setShowFilters(false);
-    if (user) {
+    if (user?.emailVerified) {
       fetchClimbers(user.uid, true);
     }
   };
@@ -206,7 +207,7 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
     setFilters(newFilters);
     setTempFilters(newFilters);
     setHasAppliedInitialFilters(true);
-    if (user) {
+    if (user?.emailVerified) {
       fetchClimbers(user.uid, true);
     }
   };
@@ -257,6 +258,15 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
     }
   };
 
+  const handleSendVerificationEmail = async () => {
+    const result = await sendVerificationEmail();
+    if (result.success) {
+      showAlert('Verification Email', result.message || 'Verification email sent.');
+    } else {
+      showAlert('Could Not Send Email', result.error || 'Failed to send verification email.');
+    }
+  };
+
   const activeFiltersCount =
     (tempFilters.experienceLevels?.length || 0) +
     (tempFilters.climbingTypes?.length || 0) +
@@ -265,6 +275,25 @@ export const DiscoverScreen: React.FC<DiscoverScreenProps> = ({ navigation }) =>
 
   // Filter out connected users from discovered climbers
   const newClimbers = discoveredClimbers.filter(c => !connectedUserIds.has(c.uid));
+
+  if (user && !user.emailVerified) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.header}>
+          <Text variant="headlineMedium" style={{ color: theme.colors.onBackground }}>
+            Discover
+          </Text>
+        </View>
+        <EmptyState
+          icon="email-check-outline"
+          title="Verify Your Email"
+          message="Discovery and connection requests are available after you verify your email address."
+          actionLabel="Send Verification Email"
+          onAction={handleSendVerificationEmail}
+        />
+      </SafeAreaView>
+    );
+  }
 
   const renderClimberCard = (item: ClimberProfile, isConnected: boolean = false) => {
     return (

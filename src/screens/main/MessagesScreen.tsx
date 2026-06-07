@@ -9,6 +9,8 @@ import { Card, Avatar, LoadingSpinner, EmptyState } from '../../components/commo
 import { useAuthStore, useMessageStore } from '../../store';
 import { Conversation } from '../../types';
 import { format, isToday, isYesterday } from 'date-fns';
+import { showAlert } from '../../utils/alert';
+import { sendVerificationEmail } from '../../services/authService';
 
 interface MessagesScreenProps {
   navigation: any;
@@ -28,27 +30,36 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({ navigation }) =>
   // Refresh conversations when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (user) {
+      if (user?.emailVerified) {
         fetchConversations(user.uid);
       }
     }, [user])
   );
 
   useEffect(() => {
-    if (user) {
+    if (user?.emailVerified) {
       subscribeToUserConversations(user.uid);
     }
     // Don't cleanup here - HomeScreen manages the subscription lifecycle
   }, [user]);
 
   const handleRefresh = useCallback(() => {
-    if (user) {
+    if (user?.emailVerified) {
       fetchConversations(user.uid);
     }
   }, [user, fetchConversations]);
 
   const handleOpenConversation = (conversation: Conversation) => {
     navigation.navigate('Chat', { conversationId: conversation.id });
+  };
+
+  const handleSendVerificationEmail = async () => {
+    const result = await sendVerificationEmail();
+    if (result.success) {
+      showAlert('Verification Email', result.message || 'Verification email sent.');
+    } else {
+      showAlert('Could Not Send Email', result.error || 'Failed to send verification email.');
+    }
   };
 
   const formatMessageTime = (date: Date | null) => {
@@ -145,6 +156,25 @@ export const MessagesScreen: React.FC<MessagesScreenProps> = ({ navigation }) =>
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <LoadingSpinner fullScreen message="Loading conversations..." />
+      </SafeAreaView>
+    );
+  }
+
+  if (user && !user.emailVerified) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.header}>
+          <Text variant="headlineMedium" style={{ color: theme.colors.onBackground }}>
+            Messages
+          </Text>
+        </View>
+        <EmptyState
+          icon="email-check-outline"
+          title="Verify Your Email"
+          message="Messaging is available after you verify your email address."
+          actionLabel="Send Verification Email"
+          onAction={handleSendVerificationEmail}
+        />
       </SafeAreaView>
     );
   }

@@ -19,6 +19,11 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && authUid() == userId;
     }
+
+    // Verified email is required for social features that expose or contact other users.
+    function hasVerifiedEmail() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
     
     // Helper function to check if user is participant in conversation
     function isParticipant(conversationData) {
@@ -30,6 +35,10 @@ service cloud.firestore {
     function isSessionOwner(sessionId) {
       return isAuthenticated() &&
              get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == authUid();
+    }
+
+    function preservesFields(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
     
     // Users collection
@@ -45,8 +54,8 @@ service cloud.firestore {
     
     // Profiles collection
     match /profiles/{userId} {
-      // Anyone authenticated can read profiles (for discovery)
-      allow read: if isAuthenticated();
+      // Users can read their own profile before verification; discovery requires verification.
+      allow read: if isOwner(userId) || hasVerifiedEmail();
       
       // Only the user can write their own profile
       allow create: if isOwner(userId);
@@ -105,12 +114,12 @@ service cloud.firestore {
     // Matches collection
     match /matches/{matchId} {
       // Users can read matches where they are involved
-      allow read: if isAuthenticated() && 
+      allow read: if hasVerifiedEmail() && 
                     (resource.data.userId == authUid() || 
                      resource.data.matchedUserId == authUid());
       
       // Users can create matches
-      allow create: if isAuthenticated() && 
+      allow create: if hasVerifiedEmail() && 
                       request.resource.data.userId == authUid() &&
                       request.resource.data.keys().hasOnly([
                         'userId',
@@ -123,7 +132,7 @@ service cloud.firestore {
                       request.resource.data.initiatedBy == authUid();
       
       // Users can update matches they're involved in
-      allow update: if isAuthenticated() && 
+      allow update: if hasVerifiedEmail() && 
                       (resource.data.userId == authUid() || 
                        resource.data.matchedUserId == authUid()) &&
                       request.resource.data.userId == resource.data.userId &&
@@ -140,17 +149,17 @@ service cloud.firestore {
                       ]);
       
       // Users can delete matches they created
-      allow delete: if isAuthenticated() && 
+      allow delete: if hasVerifiedEmail() && 
                       resource.data.userId == authUid();
     }
     
     // Conversations collection
     match /conversations/{conversationId} {
       // Participants can read the conversation
-      allow read: if isAuthenticated() && isParticipant(resource.data);
+      allow read: if hasVerifiedEmail() && isParticipant(resource.data);
       
       // Authenticated users can create conversations
-      allow create: if isAuthenticated() && 
+      allow create: if hasVerifiedEmail() && 
                       authUid() in request.resource.data.participantIds &&
                       request.resource.data.participantIds.size() == 2 &&
                       request.resource.data.keys().hasOnly([
@@ -163,7 +172,7 @@ service cloud.firestore {
                       ]);
       
       // Participants can update conversation (e.g., read receipts)
-      allow update: if isAuthenticated() && isParticipant(resource.data) &&
+      allow update: if hasVerifiedEmail() && isParticipant(resource.data) &&
                       request.resource.data.participantIds == resource.data.participantIds &&
                       request.resource.data.createdAt == resource.data.createdAt &&
                       request.resource.data.keys().hasOnly([
@@ -176,16 +185,16 @@ service cloud.firestore {
                       ]);
       
       // Participants can delete conversation
-      allow delete: if isAuthenticated() && isParticipant(resource.data);
+      allow delete: if hasVerifiedEmail() && isParticipant(resource.data);
       
       // Messages subcollection
       match /messages/{messageId} {
         // Conversation participants can read messages
-        allow read: if isAuthenticated() && 
+        allow read: if hasVerifiedEmail() && 
                       authUid() in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
         
         // Participants can send messages
-        allow create: if isAuthenticated() && 
+        allow create: if hasVerifiedEmail() && 
                         authUid() in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
                         request.resource.data.senderId == authUid() &&
                         request.resource.data.conversationId == conversationId &&
@@ -201,7 +210,7 @@ service cloud.firestore {
                         ]);
         
         // Participants can update messages (for read receipts) or sender can edit their message
-        allow update: if isAuthenticated() && 
+        allow update: if hasVerifiedEmail() && 
                         authUid() in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds &&
                         request.resource.data.senderId == resource.data.senderId &&
                         request.resource.data.conversationId == resource.data.conversationId &&
@@ -219,21 +228,21 @@ service cloud.firestore {
                         authUid() in request.resource.data.readBy;
         
         // Message sender can delete their own message
-        allow delete: if isAuthenticated() && 
+        allow delete: if hasVerifiedEmail() && 
                         resource.data.senderId == authUid();
       }
     }
     
     // Discovery/potential matches collection (for the discover feature)
     match /potentialMatches/{matchId} {
-      allow read: if isAuthenticated() && resource.data.userId == authUid();
-      allow create: if isAuthenticated() &&
+      allow read: if hasVerifiedEmail() && resource.data.userId == authUid();
+      allow create: if hasVerifiedEmail() &&
                       request.resource.data.userId == authUid() &&
                       request.resource.data.keys().hasOnly(['userId', 'score', 'createdAt', 'updatedAt']);
-      allow update: if isAuthenticated() &&
+      allow update: if hasVerifiedEmail() &&
                       resource.data.userId == authUid() &&
                       request.resource.data.userId == resource.data.userId;
-      allow delete: if isAuthenticated() && resource.data.userId == authUid();
+      allow delete: if hasVerifiedEmail() && resource.data.userId == authUid();
     }
     
     // Gyms collection (climbing gyms and outdoor locations)
@@ -241,11 +250,63 @@ service cloud.firestore {
       // Anyone authenticated can read gym data
       allow read: if isAuthenticated();
       
-      // Authenticated users can add new gyms
-      allow create: if isAuthenticated();
+      // Verified users can add new gyms with constrained fields.
+      allow create: if hasVerifiedEmail() &&
+                      request.resource.data.addedBy == authUid() &&
+                      request.resource.data.sessionCount == 0 &&
+                      request.resource.data.verified == false &&
+                      request.resource.data.keys().hasOnly([
+                        'id',
+                        'name',
+                        'address',
+                        'city',
+                        'state',
+                        'country',
+                        'placeId',
+                        'location',
+                        'type',
+                        'category',
+                        'chain',
+                        'amenities',
+                        'verified',
+                        'addedBy',
+                        'sessionCount',
+                        'createdAt',
+                        'updatedAt'
+                      ]);
       
-      // Anyone authenticated can update gym (increment session count, etc.)
-      allow update: if isAuthenticated();
+      // Any verified user can only increment popularity; the creator can correct basic listing details.
+      allow update: if hasVerifiedEmail() && (
+                      (
+                        preservesFields(['sessionCount', 'updatedAt']) &&
+                        request.resource.data.sessionCount == resource.data.sessionCount + 1
+                      ) ||
+                      (
+                        resource.data.addedBy == authUid() &&
+                        request.resource.data.addedBy == resource.data.addedBy &&
+                        request.resource.data.verified == resource.data.verified &&
+                        request.resource.data.createdAt == resource.data.createdAt &&
+                        request.resource.data.keys().hasOnly([
+                          'id',
+                          'name',
+                          'address',
+                          'city',
+                          'state',
+                          'country',
+                          'placeId',
+                          'location',
+                          'type',
+                          'category',
+                          'chain',
+                          'amenities',
+                          'verified',
+                          'addedBy',
+                          'sessionCount',
+                          'createdAt',
+                          'updatedAt'
+                        ])
+                      )
+                    );
       
       // Only the user who added the gym can delete it
       allow delete: if isAuthenticated() && 
@@ -254,8 +315,8 @@ service cloud.firestore {
     
     // Schedules collection (user climbing availability)
     match /schedules/{userId} {
-      // Anyone authenticated can read schedules (for finding overlaps with connections)
-      allow read: if isAuthenticated();
+      // Own schedule is available before verification; viewing others requires verification.
+      allow read: if isOwner(userId) || hasVerifiedEmail();
       
       // Only the user can write their own schedule
       allow create: if isOwner(userId);

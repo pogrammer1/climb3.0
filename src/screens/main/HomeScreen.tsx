@@ -27,15 +27,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (user) {
         fetchSessions(user.uid);
         fetchStats(user.uid);
-        fetchPendingRequests(user.uid);
-        fetchUnreadCount(user.uid);
+        if (user.emailVerified) {
+          fetchPendingRequests(user.uid);
+          fetchUnreadCount(user.uid);
+        }
       }
     }, [user])
   );
 
   // Subscribe to conversations for real-time unread count updates
   useEffect(() => {
-    if (user) {
+    if (user?.emailVerified) {
       subscribeToUserConversations(user.uid);
     }
   }, [user]);
@@ -46,8 +48,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     await Promise.all([
       fetchSessions(user.uid, true),
       fetchStats(user.uid),
-      fetchPendingRequests(user.uid),
-      fetchUnreadCount(user.uid),
+      ...(user.emailVerified
+        ? [
+            fetchPendingRequests(user.uid),
+            fetchUnreadCount(user.uid),
+          ]
+        : []),
     ]);
     setRefreshing(false);
   };

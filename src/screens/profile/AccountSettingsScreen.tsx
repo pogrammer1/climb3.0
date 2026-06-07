@@ -1,13 +1,13 @@
 // Account Settings Screen
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView } from 'react-native';
+import { Platform, StyleSheet, View, ScrollView } from 'react-native';
 import { Text, useTheme, List, Divider, IconButton } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Card, Button } from '../../components/common';
 import { useAuthStore } from '../../store';
 import { showAlert } from '../../utils/alert';
-import { deleteAccount, resetPassword, sendVerificationEmail } from '../../services/authService';
+import { deleteAccount, exportUserData, resetPassword, sendVerificationEmail } from '../../services/authService';
 
 interface AccountSettingsScreenProps {
   navigation: any;
@@ -16,6 +16,7 @@ interface AccountSettingsScreenProps {
 export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ navigation }) => {
   const theme = useTheme();
   const { user, profile, clearAuth } = useAuthStore();
+  const [isExportingData, setIsExportingData] = useState(false);
   const [isSendingPasswordReset, setIsSendingPasswordReset] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
@@ -73,6 +74,40 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
     );
   };
 
+  const handleExportData = async () => {
+    if (isExportingData) return;
+
+    setIsExportingData(true);
+    const result = await exportUserData();
+    setIsExportingData(false);
+
+    if (!result.success || !result.data) {
+      showAlert('Could Not Export Data', result.error || 'Please try again or contact support.');
+      return;
+    }
+
+    if (Platform.OS !== 'web') {
+      showAlert('Export Ready', 'Data export is currently available from the web version of Belay.');
+      return;
+    }
+
+    const exportedAt = result.data.exportedAt.replace(/[:.]/g, '-');
+    const filename = `belay-data-export-${exportedAt}.json`;
+    const blob = new Blob([JSON.stringify(result.data, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+
+    showAlert('Export Downloaded', 'Your Belay data export has been downloaded as a JSON file.');
+  };
+
   const handleSendVerificationEmail = async () => {
     const result = await sendVerificationEmail();
     if (result.success) {
@@ -125,6 +160,22 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
               </Text>
             </View>
           </View>
+        </Card>
+
+        {/* Data Rights */}
+        <Card style={styles.section}>
+          <Text variant="titleMedium" style={[styles.sectionTitle, { color: theme.colors.onBackground }]}>
+            Data
+          </Text>
+
+          <List.Item
+            title="Export My Data"
+            description="Download your account and app data as JSON"
+            left={(props) => <List.Icon {...props} icon="download-outline" />}
+            right={(props) => <List.Icon {...props} icon="chevron-right" />}
+            onPress={handleExportData}
+            disabled={isExportingData}
+          />
         </Card>
 
         {/* Edit Profile */}

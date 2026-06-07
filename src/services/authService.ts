@@ -41,6 +41,13 @@ type DeleteAccountCallableResult = {
   deleted: boolean;
 };
 
+export type ExportUserDataResult = {
+  exportedAt: string;
+  userId: string;
+  auth: Record<string, unknown> | null;
+  firestore: Record<string, unknown>;
+};
+
 const getRetryDelayText = (retryAfterMs: number): string => {
   const retryInSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
   if (retryInSeconds >= 60) {
@@ -296,6 +303,46 @@ export const deleteAccount = async (): Promise<ApiResponse<null>> => {
       error: error?.code === 'functions/unauthenticated'
         ? 'Please sign in again to delete your account.'
         : 'Failed to delete account. Please try again or contact support.',
+    };
+  }
+};
+
+/**
+ * Export current user's account and app data.
+ */
+export const exportUserData = async (): Promise<ApiResponse<ExportUserDataResult>> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return {
+        success: false,
+        error: 'No user is currently signed in.',
+      };
+    }
+
+    const functions = getFunctions(app, 'us-central1');
+    const callable = httpsCallable<void, ExportUserDataResult>(functions, 'exportUserData');
+    const result = await callable();
+
+    if (!result.data?.exportedAt) {
+      return {
+        success: false,
+        error: 'Failed to export data.',
+      };
+    }
+
+    return {
+      success: true,
+      data: result.data,
+      message: 'Data export ready.',
+    };
+  } catch (error: any) {
+    logServiceError('AuthService.exportUserData', error);
+    return {
+      success: false,
+      error: error?.code === 'functions/unauthenticated'
+        ? 'Please sign in again to export your data.'
+        : 'Failed to export data. Please try again or contact support.',
     };
   }
 };

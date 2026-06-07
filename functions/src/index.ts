@@ -67,6 +67,13 @@ type DeleteAccountResult = {
   counts: Record<string, number>;
 };
 
+type ExportUserDataResult = {
+  exportedAt: string;
+  userId: string;
+  auth: Record<string, unknown> | null;
+  firestore: Record<string, unknown>;
+};
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -93,6 +100,55 @@ function safeErrorDetails(error: unknown): { code?: string; name?: string } {
   }
 
   return details;
+}
+
+function serializeFirestoreValue(value: unknown): unknown {
+  if (value == null) {
+    return value;
+  }
+
+  if (value instanceof admin.firestore.Timestamp) {
+    return value.toDate().toISOString();
+  }
+
+  if (value instanceof admin.firestore.GeoPoint) {
+    return {
+      latitude: value.latitude,
+      longitude: value.longitude,
+    };
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(serializeFirestoreValue);
+  }
+
+  if (typeof value === "object") {
+    const serialized: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([key, nestedValue]) => {
+      serialized[key] = serializeFirestoreValue(nestedValue);
+    });
+    return serialized;
+  }
+
+  return value;
+}
+
+function serializeDocument(docSnap: FirebaseFirestore.DocumentSnapshot): Record<string, unknown> {
+  return {
+    id: docSnap.id,
+    ...(serializeFirestoreValue(docSnap.data() || {}) as Record<string, unknown>),
+  };
+}
+
+async function getSerializedQueryDocuments(
+  query: FirebaseFirestore.Query
+): Promise<Record<string, unknown>[]> {
+  const snapshot = await query.get();
+  return snapshot.docs.map(serializeDocument);
 }
 
 async function deleteQueryDocuments(query: FirebaseFirestore.Query): Promise<number> {
@@ -272,6 +328,112 @@ export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Pr
     logger.error("sendMatchRequest callable failed", safeErrorDetails(error));
 
     throw new HttpsError("internal", "Failed to send match request.");
+  }
+});
+
+export const exportUserData = onCall(async (request): Promise<ExportUserDataResult> => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "You must be signed in to export your data.");
+  }
+
+  const userId = request.auth.uid;
+
+  try {
+    let authData: Record<string, unknown> | null = null;
+    try {
+      const userRecord = await admin.auth().getUser(userId);
+      authData = {
+        uid: userRecord.uid,
+        email: userRecord.email || null,
+        emailVerified: userRecord.emailVerified,
+        displayName: userRecord.displayName || null,
+        photoURL: userRecord.photoURL || null,
+        disabled: userRecord.disabled,
+        metadata: {
+          creationTime: userRecord.metadata.creationTime,
+          lastSignInTime: userRecord.metadata.lastSignInTime,
+          lastRefreshTime: userRecord.metadata.lastRefreshTime || null,
+        },
+      };
+    } catch (error) {
+      logger.warn("Auth export lookup skipped", safeErrorDetails(error));
+    }
+
+    const userDoc = await db.collection("users").doc(userId).get();
+    const profileRef = db.collection("profiles").doc(userId);
+    const profileDoc = await profileRef.get();
+    const scheduleDoc = await db.collection("schedules").doc(userId).get();
+    const [profileAchievements, profileStats] = await Promise.all([
+      getSerializedQueryDocuments(profileRef.collection("achievements").orderBy("unlockedAt", "desc")),
+      getSerializedQueryDocuments(profileRef.collection("stats")),
+    ]);
+
+    const sessionsSnapshot = await db
+      .collection("sessions")
+      .where("userId", "==", userId)
+      .orderBy("date", "desc")
+      .get();
+    const sessions = await Promise.all(
+      sessionsSnapshot.docs.map(async (sessionDoc) => ({
+        ...serializeDocument(sessionDoc),
+        climbs: await getSerializedQueryDocuments(
+          db.collection("climbs").where("sessionId", "==", sessionDoc.id)
+        ),
+      }))
+    );
+
+    const conversationsSnapshot = await db
+      .collection("conversations")
+      .where("participantIds", "array-contains", userId)
+      .orderBy("lastMessageAt", "desc")
+      .get();
+    const conversations = await Promise.all(
+      conversationsSnapshot.docs.map(async (conversationDoc) => ({
+        ...serializeDocument(conversationDoc),
+        messages: await getSerializedQueryDocuments(
+          conversationDoc.ref.collection("messages").orderBy("createdAt", "asc")
+        ),
+      }))
+    );
+
+    const [
+      matchesInitiated,
+      matchesReceived,
+      notifications,
+      recipientNotifications,
+    ] = await Promise.all([
+      getSerializedQueryDocuments(db.collection("matches").where("userId", "==", userId)),
+      getSerializedQueryDocuments(db.collection("matches").where("matchedUserId", "==", userId)),
+      getSerializedQueryDocuments(db.collection("notifications").where("userId", "==", userId)),
+      getSerializedQueryDocuments(db.collection("notifications").where("recipientId", "==", userId)),
+    ]);
+
+    logger.info("User data export completed");
+    return {
+      exportedAt: new Date().toISOString(),
+      userId,
+      auth: authData,
+      firestore: {
+        user: userDoc.exists ? serializeDocument(userDoc) : null,
+        profile: profileDoc.exists ? serializeDocument(profileDoc) : null,
+        profileAchievements,
+        profileStats,
+        schedule: scheduleDoc.exists ? serializeDocument(scheduleDoc) : null,
+        sessions,
+        matches: {
+          initiated: matchesInitiated,
+          received: matchesReceived,
+        },
+        conversations,
+        notifications: {
+          owned: notifications,
+          received: recipientNotifications,
+        },
+      },
+    };
+  } catch (error) {
+    logger.error("exportUserData callable failed", safeErrorDetails(error));
+    throw new HttpsError("internal", "Failed to export user data.");
   }
 });
 

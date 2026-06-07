@@ -3,7 +3,6 @@
 import {
   collection,
   doc,
-  getDoc,
   setDoc,
   getDocs,
   query,
@@ -13,7 +12,8 @@ import {
   GeoPoint,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app, db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
 import { logServiceError } from '../utils/error';
 
@@ -690,16 +690,13 @@ export const getGymByPlaceId = async (placeId: string): Promise<Gym | null> => {
  */
 export const incrementGymSessionCount = async (gymId: string): Promise<void> => {
   try {
-    const gymRef = doc(db, GYMS_COLLECTION, gymId);
-    const gymSnap = await getDoc(gymRef);
-    
-    if (gymSnap.exists()) {
-      const currentCount = gymSnap.data().sessionCount || 0;
-      await setDoc(gymRef, {
-        sessionCount: currentCount + 1,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-    }
+    const functions = getFunctions(app, 'us-central1');
+    const callable = httpsCallable<{ gymId: string }, { gymId: string; sessionCount: number }>(
+      functions,
+      'incrementGymSessionCount'
+    );
+
+    await callable({ gymId });
   } catch (error) {
     logServiceError('GymService.incrementGymSessionCount', error);
   }

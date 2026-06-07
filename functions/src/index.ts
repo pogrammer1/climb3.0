@@ -52,6 +52,15 @@ type SendMatchRequestData = {
   targetUserId?: string;
 };
 
+type IncrementGymSessionCountData = {
+  gymId?: string;
+};
+
+type IncrementGymSessionCountResult = {
+  gymId: string;
+  sessionCount: number;
+};
+
 type SendMatchRequestResult = {
   id: string;
   userId: string;
@@ -344,6 +353,55 @@ export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Pr
     throw new HttpsError("internal", "Failed to send match request.");
   }
 });
+
+export const incrementGymSessionCount = onCall<IncrementGymSessionCountData>(
+  async (request): Promise<IncrementGymSessionCountResult> => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "You must be signed in to update gym popularity.");
+    }
+
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError("failed-precondition", "Please verify your email before updating gym popularity.");
+    }
+
+    const gymId = request.data?.gymId?.trim();
+    if (!gymId) {
+      throw new HttpsError("invalid-argument", "gymId is required.");
+    }
+
+    try {
+      let nextCount = 0;
+      await db.runTransaction(async (transaction) => {
+        const gymRef = db.collection("gyms").doc(gymId);
+        const gymSnap = await transaction.get(gymRef);
+
+        if (!gymSnap.exists) {
+          throw new HttpsError("not-found", "Gym was not found.");
+        }
+
+        const currentCount = gymSnap.data()?.sessionCount;
+        nextCount = (typeof currentCount === "number" ? currentCount : 0) + 1;
+
+        transaction.update(gymRef, {
+          sessionCount: nextCount,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      return {
+        gymId,
+        sessionCount: nextCount,
+      };
+    } catch (error) {
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      logger.error("incrementGymSessionCount callable failed", safeErrorDetails(error));
+      throw new HttpsError("internal", "Failed to update gym popularity.");
+    }
+  }
+);
 
 export const exportUserData = onCall(async (request): Promise<ExportUserDataResult> => {
   if (!request.auth?.uid) {

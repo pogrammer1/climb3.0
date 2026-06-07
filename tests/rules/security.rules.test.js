@@ -652,9 +652,17 @@ describe('Security rules', () => {
       })
     );
 
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(u2Db, 'gyms', 'gym_owned_by_u1'), {
         sessionCount: 3,
+        updatedAt: new Date(),
+      })
+    );
+
+    await assertSucceeds(
+      updateDoc(doc(u1Db, 'gyms', 'gym_owned_by_u1'), {
+        address: 'Updated Test St',
+        sessionCount: 2,
         updatedAt: new Date(),
       })
     );

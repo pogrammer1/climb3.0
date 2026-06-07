@@ -576,38 +576,32 @@ service cloud.firestore {
                         'updatedAt'
                       ]);
       
-      // Any verified user can only increment popularity; the creator can correct basic listing details.
-      allow update: if hasVerifiedEmail() && (
-                      (
-                        preservesFields(['sessionCount', 'updatedAt']) &&
-                        request.resource.data.sessionCount == resource.data.sessionCount + 1
-                      ) ||
-                      (
-                        resource.data.addedBy == authUid() &&
-                        request.resource.data.addedBy == resource.data.addedBy &&
-                        request.resource.data.verified == resource.data.verified &&
-                        request.resource.data.createdAt == resource.data.createdAt &&
-                        request.resource.data.keys().hasOnly([
-                          'id',
-                          'name',
-                          'address',
-                          'city',
-                          'state',
-                          'country',
-                          'placeId',
-                          'location',
-                          'type',
-                          'category',
-                          'chain',
-                          'amenities',
-                          'verified',
-                          'addedBy',
-                          'sessionCount',
-                          'createdAt',
-                          'updatedAt'
-                        ])
-                      )
-                    );
+      // Gym popularity counters are updated by Cloud Functions; creators can correct basic listing details.
+      allow update: if hasVerifiedEmail() &&
+                      resource.data.addedBy == authUid() &&
+                      request.resource.data.addedBy == resource.data.addedBy &&
+                      request.resource.data.verified == resource.data.verified &&
+                      request.resource.data.sessionCount == resource.data.sessionCount &&
+                      request.resource.data.createdAt == resource.data.createdAt &&
+                      request.resource.data.keys().hasOnly([
+                        'id',
+                        'name',
+                        'address',
+                        'city',
+                        'state',
+                        'country',
+                        'placeId',
+                        'location',
+                        'type',
+                        'category',
+                        'chain',
+                        'amenities',
+                        'verified',
+                        'addedBy',
+                        'sessionCount',
+                        'createdAt',
+                        'updatedAt'
+                      ]);
       
       // Only the user who added the gym can delete it
       allow delete: if isAuthenticated() && 

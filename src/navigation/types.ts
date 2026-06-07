@@ -36,6 +36,14 @@ export type RootStackParamList = {
   AccountSettings: undefined;
   NotificationSettings: undefined;
   Achievements: { userId?: string } | undefined;
+  ReportContent: {
+    targetType: 'user' | 'message';
+    reportedUserId?: string;
+    reportedUserName?: string;
+    conversationId?: string;
+    messageId?: string;
+    messagePreview?: string;
+  };
 };
 
 // Combined navigation types

@@ -6,7 +6,7 @@ import { useTheme } from 'react-native-paper';
 import { MainTabNavigator } from './MainTabNavigator';
 import { NewSessionScreen, SessionDetailScreen, EditSessionScreen, SessionsMapScreen } from '../screens/session';
 import { ChatScreen } from '../screens/chat';
-import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen, AccountSettingsScreen, NotificationSettingsScreen, AchievementsScreen } from '../screens/profile';
+import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen, AccountSettingsScreen, NotificationSettingsScreen, AchievementsScreen, ReportContentScreen } from '../screens/profile';
 import { ConnectionScheduleScreen, MyScheduleScreen } from '../screens/schedule';
 import { OnboardingOverlay } from '../components/common';
 import { RootStackParamList } from './types';
@@ -63,6 +63,11 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen
         name="Achievements"
         component={AchievementsScreen as React.ComponentType<{}>}
+      />
+      <Stack.Screen
+        name="ReportContent"
+        component={ReportContentScreen as React.ComponentType<{}>}
+        options={{ presentation: 'modal' }}
       />
     </Stack.Navigator>
     

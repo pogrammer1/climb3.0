@@ -1,7 +1,7 @@
 // Chat Screen - Real-time messaging
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { StyleSheet, View, FlatList, KeyboardAvoidingView, Platform, Pressable, NativeSyntheticEvent, TextInputKeyPressEventData } from 'react-native';
-import { Text, useTheme, TextInput, IconButton } from 'react-native-paper';
+import { Text, useTheme, TextInput, IconButton, Menu } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -36,6 +36,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
   } = useMessageStore();
 
   const [inputText, setInputText] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -64,14 +65,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
   );
 
   const getOtherParticipant = () => {
-    if (!currentConversation || !user) return { displayName: 'Chat', photoURL: null };
+    if (!currentConversation || !user) return { id: undefined, displayName: 'Chat', photoURL: null };
 
     const participantsMap = currentConversation.participantsMap || {};
     const otherUserId = Object.keys(participantsMap).find((id) => id !== user.uid);
     if (otherUserId) {
-      return participantsMap[otherUserId];
+      return { id: otherUserId, ...participantsMap[otherUserId] };
     }
-    return { displayName: 'Chat', photoURL: null };
+    return { id: undefined, displayName: 'Chat', photoURL: null };
   };
 
   const otherParticipant = getOtherParticipant();
@@ -104,6 +105,26 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
 
   const formatMessageTime = (date: Date): string => {
     return format(date, 'h:mm a');
+  };
+
+  const handleReportUser = () => {
+    if (!otherParticipant.id) return;
+    setMenuVisible(false);
+    navigation.navigate('ReportContent', {
+      targetType: 'user',
+      reportedUserId: otherParticipant.id,
+      reportedUserName: otherParticipant.displayName,
+    });
+  };
+
+  const handleReportMessage = (message: Message) => {
+    navigation.navigate('ReportContent', {
+      targetType: 'message',
+      reportedUserId: message.senderId,
+      conversationId,
+      messageId: message.id,
+      messagePreview: message.text,
+    });
   };
 
   const shouldShowDateSeparator = (currentMessage: Message, previousMessage?: Message): boolean => {
@@ -195,7 +216,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
             isOwnMessage ? styles.ownMessageContainer : styles.otherMessageContainer,
           ]}
         >
-          <View
+          <Pressable
+            onLongPress={() => handleReportMessage(item)}
             style={[
               styles.messageBubble,
               isOwnMessage
@@ -222,7 +244,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
               </Text>
               {renderMessageStatus(item)}
             </View>
-          </View>
+          </Pressable>
         </View>
       </>
     );
@@ -253,7 +275,18 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ navigation, route }) => 
             </Text>
           </View>
         </Pressable>
-        <IconButton icon="dots-vertical" onPress={() => {}} />
+        <Menu
+          visible={menuVisible}
+          onDismiss={() => setMenuVisible(false)}
+          anchor={<IconButton icon="dots-vertical" onPress={() => setMenuVisible(true)} />}
+        >
+          <Menu.Item
+            leadingIcon="flag-outline"
+            title="Report Climber"
+            disabled={!otherParticipant.id}
+            onPress={handleReportUser}
+          />
+        </Menu>
       </View>
 
       {/* Messages */}

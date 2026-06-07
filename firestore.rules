@@ -24,6 +24,14 @@ service cloud.firestore {
     function hasVerifiedEmail() {
       return isAuthenticated() && request.auth.token.email_verified == true;
     }
+
+    function isModerator() {
+      return isAuthenticated() &&
+             (
+               ('admin' in request.auth.token && request.auth.token.admin == true) ||
+               ('moderator' in request.auth.token && request.auth.token.moderator == true)
+             );
+    }
     
     // Helper function to check if user is participant in conversation
     function isParticipant(conversationData) {
@@ -181,6 +189,63 @@ service cloud.firestore {
              textOrNull(request.resource.data.text, 2000) &&
              textOrNull(request.resource.data.imageUrl, 2000);
     }
+
+    function validReportDoc() {
+      return request.resource.data.keys().hasOnly([
+               'reporterId',
+               'targetType',
+               'reason',
+               'details',
+               'status',
+               'reportedUserId',
+               'conversationId',
+               'messageId',
+               'messagePreview',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             request.resource.data.reporterId == authUid() &&
+             request.resource.data.targetType in ['user', 'message'] &&
+             request.resource.data.reason in [
+               'harassment',
+               'hate_speech',
+               'sexual_content',
+               'spam',
+               'impersonation',
+               'safety_concern',
+               'other'
+             ] &&
+             request.resource.data.status == 'pending' &&
+             textOrNull(request.resource.data.details, 2000) &&
+             textOrNull(request.resource.data.messagePreview, 280) &&
+             (
+               (
+                 request.resource.data.targetType == 'user' &&
+                 request.resource.data.reportedUserId is string &&
+                 request.resource.data.reportedUserId != authUid()
+               ) ||
+               (
+                 request.resource.data.targetType == 'message' &&
+                 request.resource.data.conversationId is string &&
+                 request.resource.data.messageId is string &&
+                 isParticipant(get(/databases/$(database)/documents/conversations/$(request.resource.data.conversationId)).data)
+               )
+             );
+    }
+
+    function validReportReviewUpdate() {
+      return isModerator() &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+               'status',
+               'reviewedAt',
+               'reviewedBy',
+               'moderatorNotes',
+               'updatedAt'
+             ]) &&
+             request.resource.data.status in ['pending', 'reviewed', 'dismissed', 'action_taken'] &&
+             request.resource.data.reviewedBy == authUid() &&
+             textOrNull(request.resource.data.moderatorNotes, 2000);
+    }
     
     // Users collection
     match /users/{userId} {
@@ -228,6 +293,14 @@ service cloud.firestore {
         allow update: if isOwner(userId);
         allow delete: if isOwner(userId);
       }
+    }
+
+    // User-submitted moderation reports
+    match /reports/{reportId} {
+      allow read: if (isAuthenticated() && resource.data.reporterId == authUid()) || isModerator();
+      allow create: if hasVerifiedEmail() && validReportDoc();
+      allow update: if validReportReviewUpdate();
+      allow delete: if false;
     }
     
     // Sessions collection

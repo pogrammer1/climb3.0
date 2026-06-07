@@ -155,6 +155,48 @@ export type NotificationType =
   | 'session_reminder'
   | 'profile_view';
 
+// Moderation/reporting types
+export type ReportTargetType = 'user' | 'message';
+
+export type ReportReason =
+  | 'harassment'
+  | 'hate_speech'
+  | 'sexual_content'
+  | 'spam'
+  | 'impersonation'
+  | 'safety_concern'
+  | 'other';
+
+export type ReportStatus = 'pending' | 'reviewed' | 'dismissed' | 'action_taken';
+
+export interface ContentReport {
+  id: string;
+  reporterId: string;
+  targetType: ReportTargetType;
+  reason: ReportReason;
+  details: string;
+  status: ReportStatus;
+  reportedUserId?: string;
+  conversationId?: string;
+  messageId?: string;
+  messagePreview?: string;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  moderatorNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ReportFormData {
+  targetType: ReportTargetType;
+  reason: ReportReason;
+  details: string;
+  reportedUserId?: string;
+  conversationId?: string;
+  messageId?: string;
+  messagePreview?: string;
+}
+
 // Type aliases from constants
 export type YDSGrade = typeof CLIMBING_GRADES_YDS[number];
 export type BoulderingGrade = typeof BOULDERING_GRADES[number];

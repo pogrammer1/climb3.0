@@ -110,6 +110,7 @@ export const COLLECTIONS = {
   MESSAGES: 'messages',
   MATCHES: 'matches',
   NOTIFICATIONS: 'notifications',
+  REPORTS: 'reports',
   SCHEDULES: 'schedules',
 } as const;
 

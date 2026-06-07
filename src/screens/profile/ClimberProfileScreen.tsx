@@ -169,7 +169,14 @@ export const ClimberProfileScreen: React.FC<ClimberProfileScreenProps> = ({ navi
         <Text variant="titleLarge" style={{ color: theme.colors.onBackground, flex: 1 }}>
           Climber Profile
         </Text>
-        <View style={{ width: 48 }} />
+        <IconButton
+          icon="flag-outline"
+          onPress={() => navigation.navigate('ReportContent', {
+            targetType: 'user',
+            reportedUserId: climber.uid,
+            reportedUserName: climber.displayName,
+          })}
+        />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>

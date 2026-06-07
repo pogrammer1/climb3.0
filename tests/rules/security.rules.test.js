@@ -17,6 +17,8 @@ describe('Security rules', () => {
   let testEnv;
   const authedContext = (uid, verified = true) =>
     testEnv.authenticatedContext(uid, { email_verified: verified });
+  const moderatorContext = (uid) =>
+    testEnv.authenticatedContext(uid, { email_verified: true, moderator: true });
 
   beforeAll(async () => {
     testEnv = await initializeTestEnvironment({
@@ -392,6 +394,106 @@ describe('Security rules', () => {
         imageUrl: null,
         readBy: ['u1'],
         createdAt: new Date(),
+      })
+    );
+  });
+
+  test('reports: verified users can create constrained reports and only read their own', async () => {
+    const u1Db = authedContext('u1').firestore();
+    const u2Db = authedContext('u2').firestore();
+    const u3Db = authedContext('u3').firestore();
+    const unverifiedU1Db = authedContext('u1', false).firestore();
+    const moderatorDb = moderatorContext('mod1').firestore();
+
+    const userReport = {
+      reporterId: 'u1',
+      targetType: 'user',
+      reason: 'harassment',
+      details: 'Unsafe behavior.',
+      status: 'pending',
+      reportedUserId: 'u2',
+      conversationId: null,
+      messageId: null,
+      messagePreview: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await assertSucceeds(setDoc(doc(u1Db, 'reports', 'report_user'), userReport));
+    await assertSucceeds(getDoc(doc(u1Db, 'reports', 'report_user')));
+    await assertFails(getDoc(doc(u2Db, 'reports', 'report_user')));
+
+    await assertFails(
+      setDoc(doc(unverifiedU1Db, 'reports', 'unverified_report'), userReport)
+    );
+
+    await assertFails(
+      setDoc(doc(u1Db, 'reports', 'spoofed_reporter'), {
+        ...userReport,
+        reporterId: 'u2',
+      })
+    );
+
+    await assertFails(
+      setDoc(doc(u1Db, 'reports', 'self_report'), {
+        ...userReport,
+        reportedUserId: 'u1',
+      })
+    );
+
+    await assertSucceeds(
+      setDoc(doc(u2Db, 'reports', 'report_message'), {
+        reporterId: 'u2',
+        targetType: 'message',
+        reason: 'hate_speech',
+        details: '',
+        status: 'pending',
+        reportedUserId: 'u1',
+        conversationId: 'conv_u1_u2',
+        messageId: 'msg1',
+        messagePreview: 'hello',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+    );
+
+    await assertFails(
+      setDoc(doc(u3Db, 'reports', 'nonparticipant_message_report'), {
+        reporterId: 'u3',
+        targetType: 'message',
+        reason: 'hate_speech',
+        details: '',
+        status: 'pending',
+        reportedUserId: 'u1',
+        conversationId: 'conv_u1_u2',
+        messageId: 'msg1',
+        messagePreview: 'hello',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+    );
+
+    await assertFails(
+      updateDoc(doc(u1Db, 'reports', 'report_user'), {
+        status: 'reviewed',
+      })
+    );
+
+    await assertSucceeds(getDoc(doc(moderatorDb, 'reports', 'report_user')));
+
+    await assertSucceeds(
+      updateDoc(doc(moderatorDb, 'reports', 'report_user'), {
+        status: 'reviewed',
+        reviewedAt: new Date(),
+        reviewedBy: 'mod1',
+        moderatorNotes: 'Reviewed for release test.',
+        updatedAt: new Date(),
+      })
+    );
+
+    await assertFails(
+      updateDoc(doc(moderatorDb, 'reports', 'report_user'), {
+        reporterId: 'mod1',
       })
     );
   });

@@ -33,6 +33,27 @@ const MESSAGE_SEND_RATE_LIMIT = {
   windowMs: 10_000,
 };
 
+const getMuteError = async (userId: string): Promise<string | null> => {
+  const moderationSnap = await getDoc(doc(db, COLLECTIONS.USER_MODERATION, userId));
+  if (!moderationSnap.exists()) {
+    return null;
+  }
+
+  const data = moderationSnap.data();
+  if (data.status !== 'muted') {
+    return null;
+  }
+
+  const mutedUntil = data.mutedUntil?.toDate?.() as Date | undefined;
+  if (mutedUntil && mutedUntil <= new Date()) {
+    return null;
+  }
+
+  return mutedUntil
+    ? `Messaging is muted until ${mutedUntil.toLocaleString()}.`
+    : 'Messaging is muted for this account.';
+};
+
 /**
  * Create or get existing conversation between two users
  */
@@ -194,6 +215,14 @@ export const sendMessage = async (
   imageUrl?: string
 ): Promise<ApiResponse<Message>> => {
   try {
+    const muteError = await getMuteError(senderId);
+    if (muteError) {
+      return {
+        success: false,
+        error: muteError,
+      };
+    }
+
     const rateLimitResult = checkRateLimit(`message-send:${senderId}`, MESSAGE_SEND_RATE_LIMIT);
     if (!rateLimitResult.allowed) {
       const retrySeconds = Math.max(1, Math.ceil(rateLimitResult.retryAfterMs / 1000));

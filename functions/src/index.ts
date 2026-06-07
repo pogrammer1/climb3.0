@@ -144,6 +144,18 @@ function serializeDocument(docSnap: FirebaseFirestore.DocumentSnapshot): Record<
   };
 }
 
+async function assertUserNotSuspended(userId: string): Promise<void> {
+  const moderationSnap = await db.collection("userModeration").doc(userId).get();
+  const moderationData = moderationSnap.data();
+
+  if (moderationData?.status === "suspended") {
+    throw new HttpsError(
+      "permission-denied",
+      "This account cannot use social features right now."
+    );
+  }
+}
+
 async function getSerializedQueryDocuments(
   query: FirebaseFirestore.Query
 ): Promise<Record<string, unknown>[]> {
@@ -268,6 +280,8 @@ export const sendMatchRequest = onCall<SendMatchRequestData>(async (request): Pr
   }
 
   try {
+    await assertUserNotSuspended(userId);
+
     await enforceRateLimit(
       userId,
       "sendMatchRequest",

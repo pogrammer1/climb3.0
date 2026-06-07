@@ -498,6 +498,79 @@ describe('Security rules', () => {
     );
   });
 
+  test('moderation enforcement: moderators write actions and state blocks muted/suspended users', async () => {
+    const u1Db = authedContext('u1').firestore();
+    const u2Db = authedContext('u2').firestore();
+    const moderatorDb = moderatorContext('mod1').firestore();
+
+    await assertSucceeds(
+      setDoc(doc(moderatorDb, 'moderationActions', 'action_mute_u1'), {
+        targetUserId: 'u1',
+        moderatorId: 'mod1',
+        action: 'mute',
+        reason: 'Harassment in chat.',
+        reportId: 'report_user',
+        durationMinutes: 60,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        createdAt: new Date(),
+      })
+    );
+
+    await assertSucceeds(
+      setDoc(doc(moderatorDb, 'userModeration', 'u1'), {
+        userId: 'u1',
+        status: 'muted',
+        reason: 'Harassment in chat.',
+        mutedUntil: new Date(Date.now() + 60 * 60 * 1000),
+        updatedAt: new Date(),
+        updatedBy: 'mod1',
+        lastActionId: 'action_mute_u1',
+      })
+    );
+
+    await assertSucceeds(getDoc(doc(u1Db, 'userModeration', 'u1')));
+    await assertFails(getDoc(doc(u2Db, 'userModeration', 'u1')));
+
+    await assertFails(
+      setDoc(doc(u1Db, 'moderationActions', 'forged_action'), {
+        targetUserId: 'u2',
+        moderatorId: 'u1',
+        action: 'suspend',
+        reason: 'Nope.',
+        reportId: null,
+        durationMinutes: null,
+        expiresAt: null,
+        createdAt: new Date(),
+      })
+    );
+
+    await assertFails(
+      setDoc(doc(u1Db, 'conversations', 'conv_u1_u2', 'messages', 'muted_message'), {
+        conversationId: 'conv_u1_u2',
+        senderId: 'u1',
+        text: 'hello while muted',
+        imageUrl: null,
+        readBy: ['u1'],
+        createdAt: new Date(),
+      })
+    );
+
+    await assertSucceeds(
+      setDoc(doc(moderatorDb, 'userModeration', 'u1'), {
+        userId: 'u1',
+        status: 'suspended',
+        reason: 'Release test suspension.',
+        mutedUntil: null,
+        updatedAt: new Date(),
+        updatedBy: 'mod1',
+        lastActionId: 'action_suspend_u1',
+      })
+    );
+
+    await assertFails(getDoc(doc(u1Db, 'matches', 'match_u1_u2')));
+    await assertSucceeds(getDoc(doc(u2Db, 'matches', 'match_u1_u2')));
+  });
+
   test('schedules: owner writes are constrained to their own schedule shape', async () => {
     const u1Db = authedContext('u1').firestore();
 

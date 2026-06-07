@@ -197,6 +197,39 @@ export interface ReportFormData {
   messagePreview?: string;
 }
 
+export type ModerationActionType = 'warn' | 'mute' | 'suspend' | 'lift';
+export type UserModerationStatus = 'active' | 'warned' | 'muted' | 'suspended';
+
+export interface ModerationAction {
+  id: string;
+  targetUserId: string;
+  moderatorId: string;
+  action: ModerationActionType;
+  reason: string;
+  reportId?: string;
+  durationMinutes?: number;
+  expiresAt?: Date | null;
+  createdAt: Date;
+}
+
+export interface UserModerationState {
+  userId: string;
+  status: UserModerationStatus;
+  reason: string;
+  mutedUntil?: Date | null;
+  updatedAt: Date;
+  updatedBy: string;
+  lastActionId: string;
+}
+
+export interface ModerationActionFormData {
+  targetUserId: string;
+  action: ModerationActionType;
+  reason: string;
+  reportId?: string;
+  durationMinutes?: number;
+}
+
 // Type aliases from constants
 export type YDSGrade = typeof CLIMBING_GRADES_YDS[number];
 export type BoulderingGrade = typeof BOULDERING_GRADES[number];

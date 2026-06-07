@@ -109,9 +109,11 @@ export const COLLECTIONS = {
   CONVERSATIONS: 'conversations',
   MESSAGES: 'messages',
   MATCHES: 'matches',
+  MODERATION_ACTIONS: 'moderationActions',
   NOTIFICATIONS: 'notifications',
   REPORTS: 'reports',
   SCHEDULES: 'schedules',
+  USER_MODERATION: 'userModeration',
 } as const;
 
 // Pagination limits

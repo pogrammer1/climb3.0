@@ -96,6 +96,13 @@ export const sendMatchRequest = async (
       };
     }
 
+    if (errorCode === 'functions/permission-denied') {
+      return {
+        success: false,
+        error: 'This account cannot send match requests right now.',
+      };
+    }
+
     logServiceError('MatchService.sendMatchRequest', error);
     return {
       success: false,

@@ -3,18 +3,17 @@
 import {
   collection,
   doc,
-  setDoc,
   getDocs,
-  query,
-  where,
-  orderBy,
   limit,
+  orderBy,
+  query,
   serverTimestamp,
+  setDoc,
+  where,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { logServiceError } from '../utils/error';
 
-// Types
 export interface Gym {
   id: string;
   name: string;
@@ -22,7 +21,7 @@ export interface Gym {
   city: string;
   state: string;
   country: string;
-  placeId?: string; // Optional external place ID for future deduplication
+  placeId?: string;
   location?: {
     latitude: number;
     longitude: number;
@@ -33,19 +32,27 @@ export interface Gym {
   amenities?: string[];
   verified: boolean;
   addedBy?: string;
-  sessionCount: number; // How many sessions logged here
+  sessionCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface PlaceAutocompleteResult {
-  placeId: string;
-  name: string;
-  address: string;
-}
-
-// The collection for gyms in Firestore
 const GYMS_COLLECTION = 'gyms';
+
+const FALLBACK_CITIES: Record<string, string[]> = {
+  queens: ['Brooklyn Boulders Queensbridge'],
+  brooklyn: ['Brooklyn Boulders Gowanus', 'The Cliffs at Gowanus'],
+  'long island city': ['The Cliffs at LIC'],
+  worcester: ['Central Rock Gym'],
+  'los angeles': ['Sender One LAX'],
+  'san francisco': ['Touchstone Mission Cliffs'],
+  seattle: ['Seattle Bouldering Project'],
+  portland: ['Planet Granite Portland'],
+  chicago: ['First Ascent Chicago'],
+  austin: ['Austin Bouldering Project'],
+  atlanta: ['Stone Summit Atlanta'],
+  denver: ['Movement Denver'],
+};
 
 const logDebugWarning = (message: string): void => {
   if (__DEV__) {
@@ -54,15 +61,13 @@ const logDebugWarning = (message: string): void => {
 };
 
 /**
- * Get all gym names in a given city (searches Firestore + fallback list)
- * Returns an array of gym names (lowercased) for matching against user homeGym
+ * Get all gym names in a given city from Firestore and the local fallback list.
  */
 export const getGymNamesByCity = async (city: string): Promise<string[]> => {
   const cityLower = city.trim().toLowerCase();
   if (!cityLower) return [];
 
   try {
-    // Search Firestore gyms collection
     const gymsRef = collection(db, GYMS_COLLECTION);
     const snapshot = await getDocs(query(gymsRef, limit(200)));
     const gymNames: string[] = [];
@@ -74,26 +79,9 @@ export const getGymNamesByCity = async (city: string): Promise<string[]> => {
       }
     });
 
-    // Also check the fallback gyms (hardcoded in GymPicker)
-    const FALLBACK_CITIES: Record<string, string[]> = {
-      'queens': ['Brooklyn Boulders Queensbridge'],
-      'brooklyn': ['Brooklyn Boulders Gowanus', 'The Cliffs at Gowanus'],
-      'long island city': ['The Cliffs at LIC'],
-      'worcester': ['Central Rock Gym'],
-      'los angeles': ['Sender One LAX'],
-      'san francisco': ['Touchstone Mission Cliffs'],
-      'seattle': ['Seattle Bouldering Project'],
-      'portland': ['Planet Granite Portland'],
-      'chicago': ['First Ascent Chicago'],
-      'austin': ['Austin Bouldering Project'],
-      'atlanta': ['Stone Summit Atlanta'],
-      'denver': ['Movement Denver'],
-    };
-
-    // Check fallback cities with partial matching
-    for (const [fbCity, fbGyms] of Object.entries(FALLBACK_CITIES)) {
-      if (fbCity.includes(cityLower) || cityLower.includes(fbCity)) {
-        for (const name of fbGyms) {
+    for (const [fallbackCity, fallbackGyms] of Object.entries(FALLBACK_CITIES)) {
+      if (fallbackCity.includes(cityLower) || cityLower.includes(fallbackCity)) {
+        for (const name of fallbackGyms) {
           const nameLower = name.toLowerCase();
           if (!gymNames.includes(nameLower)) {
             gymNames.push(nameLower);
@@ -109,9 +97,6 @@ export const getGymNamesByCity = async (city: string): Promise<string[]> => {
   }
 };
 
-/**
- * Search for gyms in our database.
- */
 export const searchGyms = async (
   searchQuery: string,
   locationType: 'indoor' | 'outdoor'
@@ -124,37 +109,31 @@ export const searchGyms = async (
   }
 };
 
-/**
- * Search gyms stored in Firestore
- */
 export const searchLocalGyms = async (
   searchQuery: string,
   locationType: 'indoor' | 'outdoor'
 ): Promise<Gym[]> => {
   try {
     const gymsRef = collection(db, GYMS_COLLECTION);
-    
-    // Get all gyms of this type (Firestore doesn't support full-text search)
     const q = query(
       gymsRef,
       where('type', '==', locationType),
       orderBy('sessionCount', 'desc'),
       limit(50)
     );
-    
+
     const snapshot = await getDocs(q);
-    const allGyms = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
+    const allGyms = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
     })) as Gym[];
-    
-    // Client-side filter by search query
+
     if (!searchQuery.trim()) {
       return allGyms.slice(0, 15);
     }
-    
+
     const lowerQuery = searchQuery.toLowerCase();
-    return allGyms.filter(gym => 
+    return allGyms.filter((gym) =>
       gym.name.toLowerCase().includes(lowerQuery) ||
       gym.city.toLowerCase().includes(lowerQuery) ||
       gym.chain?.toLowerCase().includes(lowerQuery) ||
@@ -166,407 +145,19 @@ export const searchLocalGyms = async (
   }
 };
 
-/**
- * Legacy Google Places search kept dormant while the Spark beta uses local and user-added gyms only.
- */
-export const searchGooglePlaces = async (
-  searchQuery: string,
-  locationType: 'indoor' | 'outdoor',
-  userLocation: { latitude: number; longitude: number },
-  apiKey: string
-): Promise<Gym[]> => {
-  try {
-    // Build search term based on location type
-    const searchTerm = locationType === 'indoor' 
-      ? `${searchQuery} climbing gym` 
-      : `${searchQuery} rock climbing outdoor`;
-    
-    // Check if we're in a browser environment
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      // Use Google Maps JavaScript API for web (handles CORS)
-      return await searchWithJavaScriptAPI(searchTerm, locationType, userLocation, apiKey);
-    } else {
-      // Use REST API for native (no CORS issues)
-      return await searchWithRestAPI(searchTerm, locationType, userLocation, apiKey);
-    }
-  } catch (error) {
-    logServiceError('GymService.searchGooglePlaces', error);
-    return [];
-  }
-};
-
-/**
- * Load Google Maps JavaScript API dynamically (using async loading for best performance)
- */
-let googleMapsLoaded = false;
-let googleMapsLoadPromise: Promise<void> | null = null;
-
-const loadGoogleMapsAPI = (apiKey: string): Promise<void> => {
-  if (googleMapsLoaded && (window as any).google?.maps?.places) {
-    return Promise.resolve();
-  }
-  
-  if (googleMapsLoadPromise) {
-    return googleMapsLoadPromise;
-  }
-  
-  googleMapsLoadPromise = new Promise((resolve, reject) => {
-    // Check if already loaded
-    if ((window as any).google?.maps?.places) {
-      googleMapsLoaded = true;
-      resolve();
-      return;
-    }
-    
-    // Use the recommended async loading pattern with importLibrary
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=places`;
-    script.async = true;
-    
-    script.onload = () => {
-      googleMapsLoaded = true;
-      resolve();
-    };
-    
-    script.onerror = () => {
-      googleMapsLoadPromise = null;
-      reject(new Error('Failed to load Google Maps API'));
-    };
-    
-    document.head.appendChild(script);
-  });
-  
-  return googleMapsLoadPromise;
-};
-
-/**
- * Search using Google Maps JavaScript API (for web)
- * Uses the new Places API (New) with AutocompleteSuggestion
- */
-const searchWithJavaScriptAPI = async (
-  searchTerm: string,
-  locationType: 'indoor' | 'outdoor',
-  userLocation: { latitude: number; longitude: number },
-  apiKey: string
-): Promise<Gym[]> => {
-  try {
-    await loadGoogleMapsAPI(apiKey);
-    
-    const google = (window as any).google;
-    if (!google?.maps?.places) {
-      logDebugWarning('Google Maps Places library not available');
-      return [];
-    }
-    
-    // Use the new Places API (New) with AutocompleteSuggestion
-    const { AutocompleteSuggestion, Place } = google.maps.places;
-    
-    if (AutocompleteSuggestion) {
-      // New API available - use it
-      try {
-        // Create a proper Circle object for locationBias (new API format)
-        const locationBias = new google.maps.Circle({
-          center: { lat: userLocation.latitude, lng: userLocation.longitude },
-          radius: 50000,
-        });
-        
-        const request = {
-          input: searchTerm,
-          locationBias: locationBias,
-          includedPrimaryTypes: ['establishment'],
-        };
-        
-        const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
-        
-        if (!suggestions || suggestions.length === 0) {
-          return [];
-        }
-        
-        const gyms: Gym[] = suggestions.slice(0, 5).map((suggestion: any) => {
-          const prediction = suggestion.placePrediction;
-          return {
-            id: `google_${prediction.placeId}`,
-            placeId: prediction.placeId,
-            name: prediction.mainText?.text || prediction.text?.text || '',
-            address: prediction.secondaryText?.text || '',
-            city: extractCity(prediction.text?.text || ''),
-            state: '',
-            country: '',
-            type: locationType,
-            category: locationType === 'indoor' ? 'gym' : 'crag',
-            verified: false,
-            sessionCount: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-        });
-        
-        return gyms;
-      } catch (newApiError: any) {
-        // Check for expired key error
-        if (newApiError?.message?.includes('ExpiredKey') || 
-            newApiError?.message?.includes('InvalidKey') ||
-            newApiError?.message?.includes('API key')) {
-          logDebugWarning('Google Maps API key issue');
-          // Don't fall back, just return empty results since the key is invalid
-          return [];
-        }
-        logDebugWarning('New Places API error, falling back to legacy');
-        // Fall through to legacy API
-      }
-    }
-    
-    // Fallback to legacy AutocompleteService if new API not available
-    return new Promise((resolve) => {
-      const service = new google.maps.places.AutocompleteService();
-      
-      // Use location and radius for legacy API (proper format)
-      const request = {
-        input: searchTerm,
-        location: new google.maps.LatLng(userLocation.latitude, userLocation.longitude),
-        radius: 50000,
-        types: ['establishment'],
-      };
-      
-      service.getPlacePredictions(request, (predictions: any[], status: string) => {
-        if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
-          logDebugWarning(`Places autocomplete error: ${status}`);
-          resolve([]);
-          return;
-        }
-        
-        const gyms: Gym[] = predictions.slice(0, 5).map((prediction: any) => ({
-          id: `google_${prediction.place_id}`,
-          placeId: prediction.place_id,
-          name: prediction.structured_formatting?.main_text || prediction.description,
-          address: prediction.structured_formatting?.secondary_text || '',
-          city: extractCity(prediction.description),
-          state: '',
-          country: '',
-          type: locationType,
-          category: locationType === 'indoor' ? 'gym' : 'crag',
-          verified: false,
-          sessionCount: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }));
-        
-        resolve(gyms);
-      });
-    });
-  } catch (error: any) {
-    // Check for API key errors
-    if (error?.message?.includes('ExpiredKey') || 
-        error?.message?.includes('InvalidKey') ||
-        error?.message?.includes('API key')) {
-      logDebugWarning('Google Maps API key issue');
-    } else {
-      logServiceError('GymService.searchWithJavaScriptAPI', error);
-    }
-    return [];
-  }
-};
-
-/**
- * Search using REST API (for native apps - no CORS)
- */
-const searchWithRestAPI = async (
-  searchTerm: string,
-  locationType: 'indoor' | 'outdoor',
-  userLocation: { latitude: number; longitude: number },
-  apiKey: string
-): Promise<Gym[]> => {
-  const autocompleteUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(searchTerm)}&types=establishment&location=${userLocation.latitude},${userLocation.longitude}&radius=50000&key=${apiKey}`;
-  
-  const response = await fetch(autocompleteUrl);
-  const data = await response.json();
-  
-  if (data.status !== 'OK' || !data.predictions) {
-    logDebugWarning(`Google Places API error: ${data.status}`);
-    return [];
-  }
-  
-  const gyms: Gym[] = data.predictions.slice(0, 5).map((prediction: any) => ({
-    id: `google_${prediction.place_id}`,
-    placeId: prediction.place_id,
-    name: prediction.structured_formatting?.main_text || prediction.description,
-    address: prediction.structured_formatting?.secondary_text || '',
-    city: extractCity(prediction.description),
-    state: '',
-    country: '',
-    type: locationType,
-    category: locationType === 'indoor' ? 'gym' : 'crag',
-    verified: false,
-    sessionCount: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }));
-  
-  return gyms;
-};
-
-/**
- * Legacy Google Places detail lookup kept dormant while the Spark beta uses local and user-added gyms only.
- */
-export const getPlaceDetails = async (
-  placeId: string,
-  apiKey: string
-): Promise<Partial<Gym> | null> => {
-  try {
-    // Check if we're in a browser environment
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      return await getPlaceDetailsWithJavaScriptAPI(placeId, apiKey);
-    } else {
-      return await getPlaceDetailsWithRestAPI(placeId, apiKey);
-    }
-  } catch (error) {
-    logServiceError('GymService.getPlaceDetails', error);
-    return null;
-  }
-};
-
-/**
- * Get place details using JavaScript API (for web)
- * Uses the new Places API (New) with Place class
- */
-const getPlaceDetailsWithJavaScriptAPI = async (
-  placeId: string,
-  apiKey: string
-): Promise<Partial<Gym> | null> => {
-  try {
-    await loadGoogleMapsAPI(apiKey);
-    
-    const google = (window as any).google;
-    if (!google?.maps?.places) {
-      return null;
-    }
-    
-    // Try to use the new Place class first
-    const { Place } = google.maps.places;
-    
-    if (Place) {
-      try {
-        const place = new Place({ id: placeId });
-        await place.fetchFields({
-          fields: ['displayName', 'formattedAddress', 'location', 'addressComponents'],
-        });
-        
-        const addressComponents = place.addressComponents || [];
-        
-        return {
-          name: place.displayName || '',
-          address: place.formattedAddress || '',
-          city: extractAddressComponentNew(addressComponents, 'locality'),
-          state: extractAddressComponentNew(addressComponents, 'administrative_area_level_1'),
-          country: extractAddressComponentNew(addressComponents, 'country'),
-          location: place.location ? {
-            latitude: place.location.lat(),
-            longitude: place.location.lng(),
-          } : undefined,
-        };
-      } catch (newApiError) {
-        logDebugWarning('New Place API error, falling back to legacy');
-        // Fall through to legacy API
-      }
-    }
-    
-    // Fallback to legacy PlacesService
-    return new Promise((resolve) => {
-      const div = document.createElement('div');
-      const service = new google.maps.places.PlacesService(div);
-      
-      service.getDetails(
-        {
-          placeId: placeId,
-          fields: ['name', 'formatted_address', 'geometry', 'address_components'],
-        },
-        (result: any, status: string) => {
-          if (status !== google.maps.places.PlacesServiceStatus.OK || !result) {
-            resolve(null);
-            return;
-          }
-          
-          const addressComponents = result.address_components || [];
-          
-          resolve({
-            name: result.name,
-            address: result.formatted_address,
-            city: extractAddressComponent(addressComponents, 'locality'),
-            state: extractAddressComponent(addressComponents, 'administrative_area_level_1'),
-            country: extractAddressComponent(addressComponents, 'country'),
-            location: result.geometry?.location ? {
-              latitude: result.geometry.location.lat(),
-              longitude: result.geometry.location.lng(),
-            } : undefined,
-          });
-        }
-      );
-    });
-  } catch (error) {
-    logServiceError('GymService.getPlaceDetailsWithJavaScriptAPI', error);
-    return null;
-  }
-};
-
-/**
- * Extract address component from new Places API format
- */
-const extractAddressComponentNew = (components: any[], type: string): string => {
-  const component = components.find((c: any) => c.types?.includes(type));
-  return component?.longText || component?.shortText || '';
-};
-
-/**
- * Get place details using REST API (for native)
- */
-const getPlaceDetailsWithRestAPI = async (
-  placeId: string,
-  apiKey: string
-): Promise<Partial<Gym> | null> => {
-  const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,geometry,address_components&key=${apiKey}`;
-  
-  const response = await fetch(detailsUrl);
-  const data = await response.json();
-  
-  if (data.status !== 'OK' || !data.result) {
-    return null;
-  }
-  
-  const result = data.result;
-  const addressComponents = result.address_components || [];
-  
-  return {
-    name: result.name,
-    address: result.formatted_address,
-    city: extractAddressComponent(addressComponents, 'locality'),
-    state: extractAddressComponent(addressComponents, 'administrative_area_level_1'),
-    country: extractAddressComponent(addressComponents, 'country'),
-    location: result.geometry?.location ? {
-      latitude: result.geometry.location.lat,
-      longitude: result.geometry.location.lng,
-    } : undefined,
-  };
-};
-
-/**
- * Save a user-added gym to Firestore.
- */
 export const saveGymToDatabase = async (
   gym: Partial<Gym>,
   userId: string
 ): Promise<Gym | null> => {
   try {
-    // Check if gym already exists by placeId
     if (gym.placeId) {
       const existingGym = await getGymByPlaceId(gym.placeId);
       if (existingGym) {
         return existingGym;
       }
     }
-    
+
     const gymRef = doc(collection(db, GYMS_COLLECTION));
-    
-    // Build the gym object, excluding undefined values
     const newGym: Record<string, any> = {
       id: gymRef.id,
       name: gym.name || '',
@@ -580,24 +171,17 @@ export const saveGymToDatabase = async (
       addedBy: userId,
       sessionCount: 0,
     };
-    
-    // Only add optional fields if they have values
-    if (gym.placeId) {
-      newGym.placeId = gym.placeId;
-    }
-    if (gym.location) {
-      newGym.location = gym.location;
-    }
-    if (gym.chain) {
-      newGym.chain = gym.chain;
-    }
-    
+
+    if (gym.placeId) newGym.placeId = gym.placeId;
+    if (gym.location) newGym.location = gym.location;
+    if (gym.chain) newGym.chain = gym.chain;
+
     await setDoc(gymRef, {
       ...newGym,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    
+
     logDebugWarning('Gym saved to database');
     return {
       ...newGym,
@@ -610,9 +194,6 @@ export const saveGymToDatabase = async (
   }
 };
 
-/**
- * Update a gym with new coordinates (used to fix gyms missing location data)
- */
 export const updateGymCoordinates = async (
   gymId: string,
   location: { latitude: number; longitude: number },
@@ -627,7 +208,7 @@ export const updateGymCoordinates = async (
     };
     if (city) updateData.city = city;
     if (state) updateData.state = state;
-    
+
     await setDoc(gymRef, updateData, { merge: true });
     logDebugWarning('Updated gym coordinates');
   } catch (error) {
@@ -635,19 +216,16 @@ export const updateGymCoordinates = async (
   }
 };
 
-/**
- * Get gym by Google Place ID
- */
 export const getGymByPlaceId = async (placeId: string): Promise<Gym | null> => {
   try {
     const gymsRef = collection(db, GYMS_COLLECTION);
     const q = query(gymsRef, where('placeId', '==', placeId), limit(1));
     const snapshot = await getDocs(q);
-    
+
     if (snapshot.empty) {
       return null;
     }
-    
+
     return {
       id: snapshot.docs[0].id,
       ...snapshot.docs[0].data(),
@@ -658,18 +236,12 @@ export const getGymByPlaceId = async (placeId: string): Promise<Gym | null> => {
   }
 };
 
-/**
- * Increment session count when a session is logged at this gym
- */
 export const incrementGymSessionCount = async (gymId: string): Promise<void> => {
   if (__DEV__) {
     console.warn(`Gym popularity counters are disabled on Firebase Spark (${gymId}).`);
   }
 };
 
-/**
- * Get popular gyms (most sessions logged)
- */
 export const getPopularGyms = async (
   locationType: 'indoor' | 'outdoor',
   limitCount: number = 10
@@ -682,28 +254,17 @@ export const getPopularGyms = async (
       orderBy('sessionCount', 'desc'),
       limit(limitCount)
     );
-    
+
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
+    return snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
     })) as Gym[];
   } catch (error) {
     logServiceError('GymService.getPopularGyms', error);
     return [];
   }
 };
-
-// Helper functions
-function extractCity(description: string): string {
-  const parts = description.split(',');
-  return parts.length > 1 ? parts[1].trim() : '';
-}
-
-function extractAddressComponent(components: any[], type: string): string {
-  const component = components.find((c: any) => c.types.includes(type));
-  return component?.long_name || '';
-}
 
 export default {
   searchGyms,

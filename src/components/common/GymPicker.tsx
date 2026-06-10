@@ -1,10 +1,9 @@
-// GymPicker - Select from nearby climbing gyms with Google Places integration
+// GymPicker - Select from local and user-added climbing gyms
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, Pressable, TextInput, Platform } from 'react-native';
 import { Text, useTheme, Portal, Modal, Searchbar, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
-import { searchGyms, saveGymToDatabase, getPlaceDetails, Gym } from '../../services/gymService';
+import { searchGyms, saveGymToDatabase, Gym } from '../../services/gymService';
 import { useAuthStore } from '../../store';
 import { logServiceError } from '../../utils/error';
 
@@ -58,25 +57,6 @@ export const GymPicker: React.FC<GymPickerProps> = ({
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [customLocation, setCustomLocation] = useState('');
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-
-  // Get user's location on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const location = await Location.getCurrentPositionAsync({});
-          setUserLocation({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          });
-        }
-      } catch (error) {
-        logServiceError('GymPicker.requestLocation', error);
-      }
-    })();
-  }, []);
 
   // Load initial gyms when modal opens
   useEffect(() => {
@@ -99,8 +79,7 @@ export const GymPicker: React.FC<GymPickerProps> = ({
   const loadGyms = async (query: string = '') => {
     setIsLoading(true);
     try {
-      // Try to get gyms from database/Google Places
-      const results = await searchGyms(query, locationType, userLocation || undefined);
+      const results = await searchGyms(query, locationType);
       
       if (results.length > 0) {
         setGyms(results);
@@ -129,44 +108,7 @@ export const GymPicker: React.FC<GymPickerProps> = ({
   };
 
   const handleSelect = async (gym: Gym) => {
-    // If it's a Google Places result (not yet in our DB), fetch details and save it
-    if (gym.id.startsWith('google_') && gym.placeId && user) {
-      setIsLoading(true);
-      try {
-        const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-        let gymWithDetails = { ...gym };
-        
-        // Fetch place details to get coordinates and full address info
-        if (apiKey) {
-          const details = await getPlaceDetails(gym.placeId, apiKey);
-          if (details) {
-            gymWithDetails = {
-              ...gym,
-              name: details.name || gym.name,
-              address: details.address || gym.address,
-              city: details.city || gym.city,
-              state: details.state || gym.state,
-              country: details.country || gym.country,
-              location: details.location || gym.location,
-            };
-          }
-        }
-        
-        const savedGym = await saveGymToDatabase(gymWithDetails, user.uid);
-        if (savedGym) {
-          onSelect(savedGym.name, savedGym.id);
-        } else {
-          onSelect(gymWithDetails.name, gym.id);
-        }
-      } catch (error) {
-        logServiceError('GymPicker.handleSelect', error);
-        onSelect(gym.name, gym.id);
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      onSelect(gym.name, gym.id);
-    }
+    onSelect(gym.name, gym.id);
     setVisible(false);
     setSearchQuery('');
   };
@@ -375,7 +317,6 @@ export const GymPicker: React.FC<GymPickerProps> = ({
                       <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
                         {formatGymLocation(gym)}
                         {gym.sessionCount > 0 && ` • ${gym.sessionCount} sessions`}
-                        {gym.id.startsWith('google_') && ' • via Google'}
                       </Text>
                     </View>
                     <MaterialCommunityIcons 

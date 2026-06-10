@@ -51,7 +51,7 @@ export const AccountSettingsScreen: React.FC<AccountSettingsScreenProps> = ({ na
 
     showAlert(
       'Delete Account',
-      'This will permanently delete your account, profile, sessions, climbs, schedule, matches, conversations, and uploaded photos. This action cannot be undone.',
+      'This will permanently delete your account, profile, sessions, climbs, schedule, matches, and conversations. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 

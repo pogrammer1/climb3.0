@@ -11,11 +11,11 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   onAuthStateChanged,
+  deleteUser,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app, auth, db } from '../config/firebase';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where, WhereFilterOp } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
 import { User, SignupFormData, LoginFormData, ApiResponse } from '../types';
 import { checkBackoff, checkRateLimit, registerBackoffFailure, resetBackoff } from '../utils';
@@ -35,10 +35,6 @@ const SIGN_IN_BACKOFF_CONFIG = {
   maxFailuresBeforeBackoff: 3,
   initialBackoffMs: 30 * 1000,
   maxBackoffMs: 15 * 60 * 1000,
-};
-
-type DeleteAccountCallableResult = {
-  deleted: boolean;
 };
 
 export type ExportUserDataResult = {
@@ -268,6 +264,16 @@ export const sendVerificationEmail = async (): Promise<ApiResponse<null>> => {
   }
 };
 
+const serializeSnapshot = async (path: string) => {
+  const snapshot = await getDoc(doc(db, path));
+  return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+};
+
+const serializeQuery = async (collectionName: string, field: string, operator: WhereFilterOp, value: unknown) => {
+  const snapshot = await getDocs(query(collection(db, collectionName), where(field, operator, value)));
+  return snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+};
+
 /**
  * Delete current user's account and owned app data.
  */
@@ -281,16 +287,50 @@ export const deleteAccount = async (): Promise<ApiResponse<null>> => {
       };
     }
 
-    const functions = getFunctions(app, 'us-central1');
-    const callable = httpsCallable<void, DeleteAccountCallableResult>(functions, 'deleteAccount');
-    const result = await callable();
-
-    if (!result.data?.deleted) {
-      return {
-        success: false,
-        error: 'Failed to delete account.',
-      };
+    const userId = user.uid;
+    const sessionsSnap = await getDocs(query(collection(db, COLLECTIONS.SESSIONS), where('userId', '==', userId)));
+    for (const sessionSnap of sessionsSnap.docs) {
+      const climbsSnap = await getDocs(query(collection(db, COLLECTIONS.CLIMBS), where('sessionId', '==', sessionSnap.id)));
+      for (const climbSnap of climbsSnap.docs) {
+        await deleteDoc(climbSnap.ref);
+      }
+      await deleteDoc(sessionSnap.ref);
     }
+
+    const matchesAsRequester = await getDocs(query(collection(db, COLLECTIONS.MATCHES), where('userId', '==', userId)));
+    for (const matchSnap of matchesAsRequester.docs) {
+      await deleteDoc(matchSnap.ref);
+    }
+
+    const matchesAsRecipient = await getDocs(query(collection(db, COLLECTIONS.MATCHES), where('matchedUserId', '==', userId)));
+    for (const matchSnap of matchesAsRecipient.docs) {
+      await deleteDoc(matchSnap.ref);
+    }
+
+    const conversationsSnap = await getDocs(
+      query(collection(db, COLLECTIONS.CONVERSATIONS), where('participantIds', 'array-contains', userId))
+    );
+    for (const conversationSnap of conversationsSnap.docs) {
+      await deleteDoc(conversationSnap.ref);
+    }
+
+    const achievementsSnap = await getDocs(collection(db, COLLECTIONS.PROFILES, userId, 'achievements'));
+    for (const achievementSnap of achievementsSnap.docs) {
+      await deleteDoc(achievementSnap.ref);
+    }
+
+    const statsSnap = await getDocs(collection(db, COLLECTIONS.PROFILES, userId, 'stats'));
+    for (const statSnap of statsSnap.docs) {
+      await deleteDoc(statSnap.ref);
+    }
+
+    await Promise.allSettled([
+      deleteDoc(doc(db, COLLECTIONS.SCHEDULES, userId)),
+      deleteDoc(doc(db, COLLECTIONS.PROFILES, userId)),
+      deleteDoc(doc(db, COLLECTIONS.USERS, userId)),
+    ]);
+
+    await deleteUser(user);
 
     return {
       success: true,
@@ -300,7 +340,7 @@ export const deleteAccount = async (): Promise<ApiResponse<null>> => {
     logServiceError('AuthService.deleteAccount', error);
     return {
       success: false,
-      error: error?.code === 'functions/unauthenticated'
+      error: error?.code === 'auth/requires-recent-login'
         ? 'Please sign in again to delete your account.'
         : 'Failed to delete account. Please try again or contact support.',
     };
@@ -320,29 +360,52 @@ export const exportUserData = async (): Promise<ApiResponse<ExportUserDataResult
       };
     }
 
-    const functions = getFunctions(app, 'us-central1');
-    const callable = httpsCallable<void, ExportUserDataResult>(functions, 'exportUserData');
-    const result = await callable();
+    const userId = user.uid;
+    const [userDoc, profileDoc, scheduleDoc, sessions, matchesStarted, matchesReceived, conversations] =
+      await Promise.all([
+        serializeSnapshot(`${COLLECTIONS.USERS}/${userId}`),
+        serializeSnapshot(`${COLLECTIONS.PROFILES}/${userId}`),
+        serializeSnapshot(`${COLLECTIONS.SCHEDULES}/${userId}`),
+        serializeQuery(COLLECTIONS.SESSIONS, 'userId', '==', userId),
+        serializeQuery(COLLECTIONS.MATCHES, 'userId', '==', userId),
+        serializeQuery(COLLECTIONS.MATCHES, 'matchedUserId', '==', userId),
+        serializeQuery(COLLECTIONS.CONVERSATIONS, 'participantIds', 'array-contains', userId),
+      ]);
 
-    if (!result.data?.exportedAt) {
-      return {
-        success: false,
-        error: 'Failed to export data.',
-      };
-    }
+    const achievementSnap = await getDocs(collection(db, COLLECTIONS.PROFILES, userId, 'achievements'));
+    const achievements = achievementSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+
+    const data: ExportUserDataResult = {
+      exportedAt: new Date().toISOString(),
+      userId,
+      auth: {
+        uid: user.uid,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+      },
+      firestore: {
+        user: userDoc,
+        profile: profileDoc,
+        schedule: scheduleDoc,
+        sessions,
+        matches: [...matchesStarted, ...matchesReceived],
+        conversations,
+        achievements,
+      },
+    };
 
     return {
       success: true,
-      data: result.data,
+      data,
       message: 'Data export ready.',
     };
   } catch (error: any) {
     logServiceError('AuthService.exportUserData', error);
     return {
       success: false,
-      error: error?.code === 'functions/unauthenticated'
-        ? 'Please sign in again to export your data.'
-        : 'Failed to export data. Please try again or contact support.',
+      error: 'Failed to export data. Please try again or contact support.',
     };
   }
 };

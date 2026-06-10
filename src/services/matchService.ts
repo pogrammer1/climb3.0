@@ -2,6 +2,7 @@
 import {
   doc,
   collection,
+  addDoc,
   getDoc,
   getDocs,
   updateDoc,
@@ -14,8 +15,7 @@ import {
   and,
   serverTimestamp,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app, db } from '../config/firebase';
+import { db } from '../config/firebase';
 import { COLLECTIONS, MATCH_STATUS } from '../constants';
 import {
   ClimberMatch,
@@ -27,20 +27,6 @@ import { getOrCreateConversation } from './messageService';
 import { getProfile } from './profileService';
 import { logServiceError } from '../utils/error';
 
-type SendMatchRequestCallableData = {
-  targetUserId: string;
-};
-
-type SendMatchRequestCallableResult = {
-  id: string;
-  userId: string;
-  matchedUserId: string;
-  status: string;
-  initiatedBy: string;
-  createdAt: number;
-  updatedAt: number;
-};
-
 /**
  * Send a match request to another climber
  */
@@ -49,60 +35,54 @@ export const sendMatchRequest = async (
   targetUserId: string
 ): Promise<ApiResponse<ClimberMatch>> => {
   try {
-    const functions = getFunctions(app, 'us-central1');
-    const callable = httpsCallable<SendMatchRequestCallableData, SendMatchRequestCallableResult>(
-      functions,
-      'sendMatchRequest'
-    );
+    const matchesRef = collection(db, COLLECTIONS.MATCHES);
+    const [directMatchSnap, reverseMatchSnap] = await Promise.all([
+      getDocs(query(
+        matchesRef,
+        where('userId', '==', userId),
+        where('matchedUserId', '==', targetUserId),
+        limit(1)
+      )),
+      getDocs(query(
+        matchesRef,
+        where('userId', '==', targetUserId),
+        where('matchedUserId', '==', userId),
+        limit(1)
+      )),
+    ]);
 
-    const callableResult = await callable({ targetUserId });
-    const resultData = callableResult.data;
-
-    if (!resultData?.id) {
-      return {
-        success: false,
-        error: 'Failed to send match request',
-      };
-    }
-    
-    return {
-      success: true,
-      data: {
-        id: resultData.id,
-        userId: resultData.userId,
-        matchedUserId: resultData.matchedUserId,
-        status: resultData.status as ClimberMatch['status'],
-        initiatedBy: resultData.initiatedBy,
-        createdAt: new Date(resultData.createdAt),
-        updatedAt: new Date(resultData.updatedAt),
-      } as ClimberMatch,
-      message: 'Match request sent',
-    };
-  } catch (error: any) {
-    const errorCode = error?.code as string | undefined;
-    if (errorCode === 'functions/already-exists') {
+    if (!directMatchSnap.empty || !reverseMatchSnap.empty) {
       return {
         success: false,
         error: 'A match request already exists with this climber',
       };
     }
 
-    if (errorCode === 'functions/resource-exhausted') {
-      const retryAfterMs = Number(error?.details?.retryAfterMs || 0);
-      const retryMinutes = Math.max(1, Math.ceil(retryAfterMs / 60000));
-      return {
-        success: false,
-        error: `Too many match requests. Please wait ${retryMinutes} minute(s) before trying again.`,
-      };
-    }
+    const matchData = {
+      userId,
+      matchedUserId: targetUserId,
+      status: MATCH_STATUS.PENDING,
+      initiatedBy: userId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
 
-    if (errorCode === 'functions/permission-denied') {
-      return {
-        success: false,
-        error: 'This account cannot send match requests right now.',
-      };
-    }
-
+    const docRef = await addDoc(matchesRef, matchData);
+    
+    return {
+      success: true,
+      data: {
+        id: docRef.id,
+        userId,
+        matchedUserId: targetUserId,
+        status: MATCH_STATUS.PENDING as ClimberMatch['status'],
+        initiatedBy: userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as ClimberMatch,
+      message: 'Match request sent',
+    };
+  } catch (error: any) {
     logServiceError('MatchService.sendMatchRequest', error);
     return {
       success: false,

@@ -8,8 +8,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app, db } from '../config/firebase';
+import { db } from '../config/firebase';
 import { COLLECTIONS } from '../constants';
 import {
   AchievementDefinition,
@@ -19,18 +18,6 @@ import {
   ApiResponse,
 } from '../types';
 import { logServiceError } from '../utils/error';
-
-type SyncUserAchievementsCallableResult = {
-  stats: UserAchievementStats;
-  achievements: Array<{
-    achievementId: string;
-    currentProgress: number;
-    isUnlocked: boolean;
-    unlockedAt?: number;
-    percentComplete: number;
-  }>;
-  newAchievementIds: string[];
-};
 
 // Achievement definitions - Easy to add new achievements here
 export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
@@ -474,46 +461,13 @@ export const buildAchievementProgress = (
  */
 export const checkAndAwardAchievements = async (
   userId: string,
-  stats?: UserAchievementStats
+  stats: UserAchievementStats
 ): Promise<ApiResponse<AchievementProgress[]>> => {
   try {
-    const functions = getFunctions(app, 'us-central1');
-    const callable = httpsCallable<void, SyncUserAchievementsCallableResult>(
-      functions,
-      'syncUserAchievements'
-    );
-    const result = await callable();
-
-    const progressList = result.data.achievements.reduce<AchievementProgress[]>((items, achievement) => {
-      const definition = getAchievementDefinition(achievement.achievementId);
-
-      if (!definition) {
-        return items;
-      }
-
-      items.push({
-        achievementId: achievement.achievementId,
-        definition,
-        currentProgress: achievement.currentProgress,
-        isUnlocked: achievement.isUnlocked,
-        unlockedAt: achievement.unlockedAt ? new Date(achievement.unlockedAt) : undefined,
-        percentComplete: achievement.percentComplete,
-      });
-
-      return items;
-    }, []);
-
-    return { success: true, data: progressList };
+    const existingResult = await getUserAchievements(userId);
+    return { success: true, data: buildAchievementProgress(stats, existingResult.data || []) };
   } catch (error: any) {
     logServiceError('AchievementService.checkAndAwardAchievements', error);
-
-    if (stats) {
-      const existingResult = await getUserAchievements(userId);
-      if (existingResult.success) {
-        return { success: true, data: buildAchievementProgress(stats, existingResult.data || []) };
-      }
-    }
-
     return { success: false, error: 'Failed to check achievements' };
   }
 };

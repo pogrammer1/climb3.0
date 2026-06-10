@@ -13,19 +13,14 @@ A cross-platform (iOS, Android, Web) application for rock climbers to log sessio
 
 ## Tech Stack
 - **Frontend**: React Native with Expo (Web + Mobile from single codebase)
-- **Backend**: Firebase (Authentication, Firestore, Cloud Functions)
+- **Backend**: Firebase (Authentication, Firestore, Storage, Hosting)
 - **State Management**: Zustand
 - **UI Components**: React Native Paper
 - **Navigation**: React Navigation / Expo Router
 - **Hosting**: Firebase Hosting
 
-## Release Environment
-- Copy `.env.example` to `.env` for local Expo/web development. Values prefixed with `EXPO_PUBLIC_` are bundled into the client and must be treated as public; restrict browser API keys by domain/API in their provider consoles.
-- Copy `functions/.env.example` to `functions/.env` for local Functions emulator work. Do not commit real SMTP credentials.
-- Production email notifications read `SMTP_PASS` from Firebase Secret Manager. Set or rotate it with `firebase functions:secrets:set SMTP_PASS` before deploying Functions.
-- To clean legacy profile PII before release, run `npm run cleanup:profile-pii:dry-run` from `functions/`, then `npm run cleanup:profile-pii -- --execute` after confirming the count.
-- Web App Check uses Firebase reCAPTCHA v3. For production web builds, set `EXPO_PUBLIC_FIREBASE_APPCHECK_WEB_RECAPTCHA_SITE_KEY` and `EXPO_PUBLIC_FIREBASE_APPCHECK_REQUIRED=true`; keep `EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN` unset outside local development. Enable App Check enforcement in Firebase only after token metrics look healthy.
-- Native Expo builds still need a native App Check provider integration before enforcing App Check for iOS/Android.
+## Project Status
+Belay is preparing for beta testing with real climbers on mobile web. Current engineering focus is release readiness: security rules, account data controls, abuse reporting/moderation, production web deployment, and mobile-first UI polish.
 
 ## Security and Privacy Baseline
 - Firebase/Google Cloud provide HTTPS encryption in transit and default server-side encryption at rest for Firestore/Storage. This app does not add custom app-level field encryption for the beta release.

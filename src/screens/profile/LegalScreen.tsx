@@ -40,8 +40,8 @@ export const LegalScreen: React.FC<LegalScreenProps> = ({ navigation }) => {
             Privacy
           </Text>
           <Text variant="bodyMedium" style={[styles.paragraph, { color: theme.colors.onSurfaceVariant }]}>
-            Belay stores account details, profile information, climbing sessions, schedules, messages, reports, and
-            uploaded photos so the app can provide its core features.
+            Belay stores account details, profile information, climbing sessions, schedules, messages, reports, and any
+            uploaded media so the app can provide its core features.
           </Text>
           <Text variant="bodyMedium" style={[styles.paragraph, { color: theme.colors.onSurfaceVariant }]}>
             Your email is kept for account and notification use. Social profile data such as display name, bio, city,
@@ -50,7 +50,7 @@ export const LegalScreen: React.FC<LegalScreenProps> = ({ navigation }) => {
           </Text>
           <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
             Firebase provides encrypted transit and server-side encrypted storage. App access is limited by Firebase
-            Auth, Firestore rules, Storage rules, and Cloud Functions.
+            Auth, Firestore rules, and Storage rules.
           </Text>
         </Card>
 
@@ -59,8 +59,9 @@ export const LegalScreen: React.FC<LegalScreenProps> = ({ navigation }) => {
             Your Data
           </Text>
           <Text variant="bodyMedium" style={[styles.paragraph, { color: theme.colors.onSurfaceVariant }]}>
-            You can export your data or delete your account from Account Settings. Account deletion removes your account
-            and app data such as profile, sessions, climbs, schedule, matches, conversations, and uploaded photos.
+            You can export your data or delete your account from Account Settings. During the Spark beta, account
+            deletion removes your account and client-accessible app data such as profile, sessions, climbs, schedule,
+            matches, and conversations. Email {SUPPORT_EMAIL} for any media cleanup questions.
           </Text>
           <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
             For questions or support, email {SUPPORT_EMAIL}.

@@ -4,7 +4,7 @@ import { View, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from 'react-native-paper';
 import { MainTabNavigator } from './MainTabNavigator';
-import { NewSessionScreen, SessionDetailScreen, EditSessionScreen, SessionsMapScreen } from '../screens/session';
+import { NewSessionScreen, SessionDetailScreen, EditSessionScreen } from '../screens/session';
 import { ChatScreen } from '../screens/chat';
 import { EditProfileScreen, ClimberProfileScreen, MatchRequestsScreen, AccountSettingsScreen, NotificationSettingsScreen, AchievementsScreen, ReportContentScreen, LegalScreen } from '../screens/profile';
 import { ConnectionScheduleScreen, MyScheduleScreen } from '../screens/schedule';
@@ -37,7 +37,6 @@ export const RootNavigator: React.FC = () => {
         component={EditSessionScreen as React.ComponentType<{}>}
         options={{ presentation: 'modal' }}
       />
-      <Stack.Screen name="SessionsMap" component={SessionsMapScreen} />
       <Stack.Screen name="Chat" component={ChatScreen as React.ComponentType<{}>} />
       <Stack.Screen name="ClimberProfile" component={ClimberProfileScreen as React.ComponentType<{}>} />
       <Stack.Screen name="MatchRequests" component={MatchRequestsScreen} />

@@ -345,7 +345,7 @@ service cloud.firestore {
         // Anyone authenticated can read achievements (to see on profiles)
         allow read: if isAuthenticated();
         
-        // Achievement awards are created by Cloud Functions; users can only clear local notification state.
+        // Spark beta: achievements are primarily derived client-side; owners can remove their own legacy records.
         allow create: if false;
         allow update: if isOwner(userId) &&
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notified']) &&
@@ -353,16 +353,16 @@ service cloud.firestore {
                         request.resource.data.progress == resource.data.progress &&
                         request.resource.data.unlockedAt == resource.data.unlockedAt &&
                         request.resource.data.notified == true;
-        allow delete: if false;
+        allow delete: if isOwner(userId);
       }
       
       // Stats subcollection (messaging stats, etc.)
       match /stats/{statId} {
-        // Private stat docs are read by owners and written by Cloud Functions/Admin SDK only.
+        // Private stat docs are read-only for owners during Spark beta.
         allow read: if isOwner(userId);
         allow create: if false;
         allow update: if false;
-        allow delete: if false;
+        allow delete: if isOwner(userId);
       }
     }
 
@@ -462,9 +462,10 @@ service cloud.firestore {
                         'updatedAt'
                       ]);
       
-      // Users can delete matches they created
+      // Involved users can remove matches during Spark beta account cleanup.
       allow delete: if canUseSocialFeatures() &&
-                      resource.data.userId == authUid();
+                      (resource.data.userId == authUid() ||
+                       resource.data.matchedUserId == authUid());
     }
     
     // Conversations collection
@@ -581,7 +582,7 @@ service cloud.firestore {
                         'updatedAt'
                       ]);
       
-      // Gym popularity counters are updated by Cloud Functions; creators can correct basic listing details.
+      // Gym popularity counters are disabled during Spark beta; creators can correct basic listing details.
       allow update: if hasVerifiedEmail() &&
                       resource.data.addedBy == authUid() &&
                       request.resource.data.addedBy == resource.data.addedBy &&

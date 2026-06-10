@@ -1,4 +1,4 @@
-// Gym Service - Handles gym location data with optional Google Places integration
+// Gym Service - Handles local and user-added gym location data
 
 import {
   collection,
@@ -9,12 +9,9 @@ import {
   where,
   orderBy,
   limit,
-  GeoPoint,
   serverTimestamp,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app, db } from '../config/firebase';
-import { COLLECTIONS } from '../constants';
+import { db } from '../config/firebase';
 import { logServiceError } from '../utils/error';
 
 // Types
@@ -25,7 +22,7 @@ export interface Gym {
   city: string;
   state: string;
   country: string;
-  placeId?: string; // Google Places ID for deduplication
+  placeId?: string; // Optional external place ID for future deduplication
   location?: {
     latitude: number;
     longitude: number;
@@ -113,35 +110,14 @@ export const getGymNamesByCity = async (city: string): Promise<string[]> => {
 };
 
 /**
- * Search for gyms in our database first, then optionally Google Places
+ * Search for gyms in our database.
  */
 export const searchGyms = async (
   searchQuery: string,
-  locationType: 'indoor' | 'outdoor',
-  userLocation?: { latitude: number; longitude: number }
+  locationType: 'indoor' | 'outdoor'
 ): Promise<Gym[]> => {
   try {
-    // First, search our local database
-    const localResults = await searchLocalGyms(searchQuery, locationType);
-    
-    // If we have enough results, return them
-    if (localResults.length >= 5) {
-      return localResults;
-    }
-    
-    // Otherwise, supplement with Google Places (if API key is available)
-    const apiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
-    if (apiKey && userLocation) {
-      const googleResults = await searchGooglePlaces(searchQuery, locationType, userLocation, apiKey);
-      
-      // Merge results, avoiding duplicates by placeId
-      const existingPlaceIds = new Set(localResults.map(g => g.placeId).filter(Boolean));
-      const newGyms = googleResults.filter(g => !existingPlaceIds.has(g.placeId));
-      
-      return [...localResults, ...newGyms];
-    }
-    
-    return localResults;
+    return await searchLocalGyms(searchQuery, locationType);
   } catch (error) {
     logServiceError('GymService.searchGyms', error);
     return [];
@@ -191,8 +167,7 @@ export const searchLocalGyms = async (
 };
 
 /**
- * Search Google Places API for climbing gyms
- * Uses the JavaScript API for web (due to CORS) and REST API for native
+ * Legacy Google Places search kept dormant while the Spark beta uses local and user-added gyms only.
  */
 export const searchGooglePlaces = async (
   searchQuery: string,
@@ -431,8 +406,7 @@ const searchWithRestAPI = async (
 };
 
 /**
- * Get place details from Google Places API
- * Uses JavaScript API for web (CORS), REST API for native
+ * Legacy Google Places detail lookup kept dormant while the Spark beta uses local and user-added gyms only.
  */
 export const getPlaceDetails = async (
   placeId: string,
@@ -575,8 +549,7 @@ const getPlaceDetailsWithRestAPI = async (
 };
 
 /**
- * Save a gym to Firestore (called when user selects a Google Places result)
- * This makes it available for everyone without additional API calls
+ * Save a user-added gym to Firestore.
  */
 export const saveGymToDatabase = async (
   gym: Partial<Gym>,
@@ -689,16 +662,8 @@ export const getGymByPlaceId = async (placeId: string): Promise<Gym | null> => {
  * Increment session count when a session is logged at this gym
  */
 export const incrementGymSessionCount = async (gymId: string): Promise<void> => {
-  try {
-    const functions = getFunctions(app, 'us-central1');
-    const callable = httpsCallable<{ gymId: string }, { gymId: string; sessionCount: number }>(
-      functions,
-      'incrementGymSessionCount'
-    );
-
-    await callable({ gymId });
-  } catch (error) {
-    logServiceError('GymService.incrementGymSessionCount', error);
+  if (__DEV__) {
+    console.warn(`Gym popularity counters are disabled on Firebase Spark (${gymId}).`);
   }
 };
 
@@ -743,8 +708,6 @@ function extractAddressComponent(components: any[], type: string): string {
 export default {
   searchGyms,
   searchLocalGyms,
-  searchGooglePlaces,
-  getPlaceDetails,
   saveGymToDatabase,
   getGymByPlaceId,
   incrementGymSessionCount,

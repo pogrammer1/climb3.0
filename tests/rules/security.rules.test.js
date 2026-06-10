@@ -5,7 +5,7 @@ const {
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
-const { doc, setDoc, getDoc, updateDoc } = require('firebase/firestore');
+const { doc, setDoc, getDoc, updateDoc, deleteDoc } = require('firebase/firestore');
 
 const PROJECT_ID = 'belay-rules-test';
 const PNG_DATA_URL =
@@ -255,6 +255,8 @@ describe('Security rules', () => {
 
   test('matches: immutable ownership fields cannot be changed', async () => {
     const u1Db = authedContext('u1').firestore();
+    const u2Db = authedContext('u2').firestore();
+    const u3Db = authedContext('u3').firestore();
     const unverifiedU1Db = authedContext('u1', false).firestore();
 
     await assertSucceeds(
@@ -270,6 +272,8 @@ describe('Security rules', () => {
     );
 
     await assertFails(getDoc(doc(unverifiedU1Db, 'matches', 'match_u1_u2')));
+    await assertFails(deleteDoc(doc(u3Db, 'matches', 'match_u1_u2')));
+    await assertSucceeds(deleteDoc(doc(u2Db, 'matches', 'match_u1_u2')));
   });
 
   test('users and profiles: owner writes are field-limited and validated', async () => {
@@ -347,6 +351,11 @@ describe('Security rules', () => {
         messagesSent: 999,
       })
     );
+
+    await assertFails(deleteDoc(doc(u2Db, 'profiles', 'u1', 'achievements', 'sessions_1')));
+    await assertSucceeds(deleteDoc(doc(u1Db, 'profiles', 'u1', 'achievements', 'sessions_1')));
+    await assertFails(deleteDoc(doc(u2Db, 'profiles', 'u1', 'stats', 'messaging')));
+    await assertSucceeds(deleteDoc(doc(u1Db, 'profiles', 'u1', 'stats', 'messaging')));
   });
 
   test('sessions and climbs: reject unknown fields, owner spoofing, and oversized notes', async () => {
